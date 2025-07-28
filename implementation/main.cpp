@@ -13,7 +13,7 @@
 #include "bk_tree.h"
 namespace fs = std::filesystem;
 int main() {
-    std::cout << "------ Mini Search Engine in C++ ------\n";
+    std::cout << "\n------ Mini Search Engine in C++ ------\n";
     std::cout << "Indexing documents from './data/'...\n";
     Indexer indexer;
     Trie autoComplete;
@@ -66,7 +66,7 @@ int main() {
         if (ranked.empty()) {
             std::cout << "-> No results found.\n";
         } else {
-            std::cout << " -> Results:\n";
+            std::cout << "-> Results:\n";
             for (const auto& [id, score] : ranked) {
                 std::cout << " - " << docIdToPath[id] << " (score: " << score << ")\n";
             }
