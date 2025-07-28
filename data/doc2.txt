@@ -3,3 +3,10 @@ It focuses on the development of algorithms that allow computers to learn
 from and make predictions or decisions based on data. Supervised learning, 
 unsupervised learning, 
 and reinforcement learning are all types of machine learning.
+OOP organizes code using objects and classes.
+Core principles: encapsulation, inheritance, polymorphism, abstraction.
+Encapsulation hides internal state from outside access.
+Inheritance allows code reuse via base and derived classes.
+Polymorphism enables method overloading and overriding.
+Abstraction simplifies complex systems.
+Languages like Java, C++, and Python support OOP.

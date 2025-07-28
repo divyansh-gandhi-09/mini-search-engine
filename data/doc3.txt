@@ -2,3 +2,10 @@ Natural language processing (NLP) is a field of AI that gives machines
 the ability to read, understand, and derive meaning from human languages.
 It combines computational linguistics with statistical, 
 machine learning, and deep learning models.
+Git is a distributed version control system.
+It tracks changes in source code during development.
+Repositories can be local or hosted on platforms like GitHub.
+`git init`, `git add`, and `git commit` are basic commands.
+Branches allow parallel development.
+Merging and rebasing integrate changes.
+Commits have hashes that ensure history integrity.

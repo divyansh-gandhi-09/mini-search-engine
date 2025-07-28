@@ -1,0 +1,7 @@
+Data structures help in organizing data efficiently.
+Common types include arrays, linked lists, stacks, and queues.
+Trees and graphs are advanced data structures.
+A stack follows LIFO, while a queue follows FIFO.
+Binary search trees allow fast lookup and insertion.
+Graphs are used to model networks like maps and social media.
+Choosing the right data structure improves performance.

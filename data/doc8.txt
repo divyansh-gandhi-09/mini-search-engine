@@ -1,0 +1,7 @@
+Machine learning enables computers to learn from data.
+Supervised, unsupervised, and reinforcement learning are key types.
+Neural networks mimic human brain structures.
+Training data is used to adjust model parameters.
+Overfitting and underfitting are common challenges.
+Scikit-learn and TensorFlow are popular ML libraries.
+Feature engineering improves model accuracy.

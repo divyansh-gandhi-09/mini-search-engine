@@ -1,0 +1,7 @@
+An operating system manages hardware and software resources.
+It provides a user interface and executes programs.
+Key components include the kernel, shell, and file system.
+Processes and threads enable multitasking.
+Memory management uses paging and segmentation.
+Interrupts help manage I/O efficiently.
+Popular OSes include Windows, Linux, and macOS.

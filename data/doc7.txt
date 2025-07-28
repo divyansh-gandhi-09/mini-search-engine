@@ -1,0 +1,7 @@
+Web development involves frontend and backend technologies.
+HTML, CSS, and JavaScript are used for the frontend.
+Node.js, PHP, and Python power the backend.
+Databases like MySQL and MongoDB store user data.
+APIs allow communication between servers and clients.
+Responsive design ensures mobile compatibility.
+Web security is essential to protect user data.

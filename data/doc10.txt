@@ -1,0 +1,7 @@
+Computer networks enable data exchange between devices.
+The OSI model has 7 layers from physical to application.
+IP addresses identify devices on a network.
+TCP and UDP are core transport protocols.
+Routers and switches connect different parts of a network.
+DNS translates domain names to IP addresses.
+Firewalls and encryption enhance network security.

@@ -1,0 +1,7 @@
+Algorithms are a set of instructions for solving problems.
+Sorting and searching are classic algorithm categories.
+QuickSort, MergeSort, and BubbleSort are common sorting algorithms.
+Binary search is efficient for sorted arrays.
+Time complexity helps evaluate algorithm efficiency.
+Big O notation expresses worst-case performance.
+Recursive and iterative approaches can solve similar problems.

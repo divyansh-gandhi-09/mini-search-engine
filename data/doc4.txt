@@ -1,0 +1,7 @@
+C++ is a powerful general-purpose programming language.
+It is used to develop operating systems, browsers, games, and more.
+C++ supports both procedural and object-oriented programming.
+The language was created by Bjarne Stroustrup as an extension of C.
+Memory management is a key part of C++ programming.
+Templates, STL, and exception handling are core features.
+Modern C++ includes smart pointers and lambda expressions.

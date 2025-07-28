@@ -1,4 +1,10 @@
 Artificial Intelligence (AI) is a branch of computer science that aims to create machines that 
 can perform tasks that typically require human intelligence. These include things like visual 
 perception, speech recognition, decision-making, and language translation.
-
+Databases store and manage structured data.
+SQL is used to query relational databases.
+Tables consist of rows and columns.
+Indexes improve data retrieval speed.
+Normalization avoids data redundancy.
+NoSQL databases offer flexibility for unstructured data.
+Transactions ensure data integrity and consistency.
