@@ -1,13 +1,14 @@
 #include "ranker.h"
-std::vector<std::pair<int, double>> Ranker::rank(
-    const std::string& query,
-    const std::unordered_map<std::string, std::unordered_map<int, int>>& index,
+using namespace std;
+vector<pair<int, double>> Ranker::rank(
+    const string& query,
+    const unordered_map<string, unordered_map<int, int>>& index,
     int totalDocs
 ) {
-    std::unordered_map<int, double> docScores;
-    std::unordered_map<int, int> docLengths;
-    std::istringstream iss(query);
-    std::string term;
+    unordered_map<int, double> docScores;
+    unordered_map<int, int> docLengths;
+    istringstream iss(query);
+    string term;
     while (iss >> term) {
         if (index.count(term)) {
             const auto& postingList = index.at(term);
@@ -20,8 +21,8 @@ std::vector<std::pair<int, double>> Ranker::rank(
             }
         }
     }
-    std::vector<std::pair<int, double>> ranked(docScores.begin(), docScores.end());
-    std::sort(ranked.begin(), ranked.end(),
+    vector<pair<int, double>> ranked(docScores.begin(), docScores.end());
+    sort(ranked.begin(), ranked.end(),
               [](const auto& a, const auto& b) {
                   return a.second > b.second;
               });

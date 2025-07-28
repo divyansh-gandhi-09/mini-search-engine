@@ -5,9 +5,10 @@
 #include <cmath>
 #include <sstream>
 #include <algorithm>
+using namespace std;
 class Ranker {
 public:
-    static std::vector<std::pair<int, double>> rank(const std::string& query,
-    const std::unordered_map<std::string, std::unordered_map<int, int>>& index,
+    static vector<pair<int, double>> rank(const string& query, 
+    const unordered_map<string, unordered_map<int, int>>& index,
     int totalDocs);
 };

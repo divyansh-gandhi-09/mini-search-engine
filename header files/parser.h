@@ -1,8 +1,9 @@
 #pragma once
 #include <vector>
 #include <string>
+using namespace std;
 class Parser {
 public:
-    static std::vector<std::string> tokenize(const std::string& text);
-    static std::string readFile(const std::string& filepath);
+    static vector<string> tokenize(const string& text);
+    static string readFile(const string& filepath);
 };

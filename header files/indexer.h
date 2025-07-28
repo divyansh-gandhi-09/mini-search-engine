@@ -2,10 +2,11 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+using namespace std;
 class Indexer {
 public:
-    void indexDocument(int docID, const std::string& content);
-    std::unordered_map<std::string, std::unordered_map<int, int>> getIndex();
+    void indexDocument(int docID, const string& content);
+    unordered_map<string, unordered_map<int, int>> getIndex();
     private:
-    std::unordered_map<std::string, std::unordered_map<int, int>> invertedIndex;
+    unordered_map<string, unordered_map<int, int>> invertedIndex;
 };

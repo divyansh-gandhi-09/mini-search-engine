@@ -2,9 +2,10 @@
 #include <algorithm>
 #include <queue>
 #include <cmath>
-int BKTree::levenshtein(const std::string& a, const std::string& b) {
+using namespace std;
+int BKTree::levenshtein(const string& a, const string& b) {
     int n = a.size(), m = b.size();
-    std::vector<std::vector<int>> dp(n + 1, std::vector<int>(m + 1));
+    vector<vector<int>> dp(n + 1, vector<int>(m + 1));
    
     for (int i = 0; i <= n; ++i) dp[i][0] = i;
     for (int j = 0; j <= m; ++j) dp[0][j] = j;
@@ -14,12 +15,12 @@ int BKTree::levenshtein(const std::string& a, const std::string& b) {
             if (a[i-1] == b[j-1])
                 dp[i][j] = dp[i-1][j-1];
             else
-                dp[i][j] = 1 + std::min({dp[i-1][j], dp[i][j-1], dp[i-1][j-1]});
+                dp[i][j] = 1 + min({dp[i-1][j], dp[i][j-1], dp[i-1][j-1]});
         }
     }
     return dp[n][m];
 }
-void BKTree::insert(const std::string& word) {
+void BKTree::insert(const string& word) {
     if (!root) {
         root = new Node(word);
         return;
@@ -35,10 +36,10 @@ void BKTree::insert(const std::string& word) {
         curr = curr->children[dist];
     }
 }
-std::vector<std::string> BKTree::search(const std::string& target, int maxDistance) {
-    std::vector<std::string> result;
+vector<string> BKTree::search(const string& target, int maxDistance) {
+    vector<string> result;
     if (!root) return result;
-    std::queue<Node*> q;
+    queue<Node*> q;
     q.push(root);
 
     while (!q.empty()) {

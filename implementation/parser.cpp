@@ -3,18 +3,19 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
-std::string Parser::readFile(const std::string& filepath) {
-    std::ifstream file(filepath);
-    std::stringstream buffer;
+using namespace std;
+string Parser::readFile(const string& filepath) {
+    ifstream file(filepath);
+    stringstream buffer;
     buffer << file.rdbuf();
     return buffer.str();
 }
-std::vector<std::string> Parser::tokenize(const std::string& text) {
-    std::vector<std::string> tokens;
-    std::string word;
+vector<string> Parser::tokenize(const string& text) {
+    vector<string> tokens;
+    string word;
     for (char ch : text) {
-        if (std::isalnum(ch)) {
-            word += std::tolower(ch);
+        if (isalnum(ch)) {
+            word += tolower(ch);
         } else if (!word.empty()) {
             tokens.push_back(word);
             word.clear();
