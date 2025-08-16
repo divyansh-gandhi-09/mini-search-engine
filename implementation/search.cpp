@@ -12,16 +12,25 @@ vector<pair<int, double>> SearchEngine::search(const string& query, const Ranker
     stringstream ss(query);
     string word;
     vector<string> terms;
-    bool isAnd = false, isOr = false;
-
+    
     // Parse query
+    //making changes to actually use the parser.h
+    /*
     while (ss >> word) {
         transform(word.begin(), word.end(), word.begin(), ::tolower);
         if (word == "and") isAnd = true;
         else if (word == "or") isOr = true;
         else terms.push_back(word);
     }
-
+    */
+   
+   bool isAnd = false, isOr = false;
+   vector <string> tokens=Parser::tokenize(query);
+   for (const string& word : tokens) {
+       if (word=="and") isAnd=true;
+       else if (word=="or") isOr=true;
+       else terms.push_back(word);
+   }
     unordered_map<int, double> docScores;
 
     if (isAnd) {
