@@ -31,6 +31,10 @@ vector<pair<int, double>> SearchEngine::search(const string& query, const Ranker
        else if (word=="or") isOr=true;
        else terms.push_back(word);
    }
+   //in case of queries like only having AND , OR returning empty result
+    if (terms.empty()) {
+         return {};
+    }
     unordered_map<int, double> docScores;
 
     if (isAnd) {
