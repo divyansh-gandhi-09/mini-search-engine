@@ -11,6 +11,7 @@ vector<pair<int, double>> Ranker::rank(
     string term;
     while (iss >> term) {
         if (index.count(term)) {
+            //all the doc that contain the term
             const auto& postingList = index.at(term);
             int df = postingList.size();
             double idf = log((double)(totalDocs + 1) / (df + 1)) + 1;
