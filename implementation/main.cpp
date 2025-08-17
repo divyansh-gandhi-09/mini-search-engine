@@ -14,7 +14,14 @@
 using namespace std;
 namespace fs = std::filesystem;
 int main() {
-    cout << "\n------ Mini Search Engine in C++ ------\n";
+    cout << "\n------ Mini Search Engine Using C++ ------\n";
+    cout << "\nFeatures: \n";
+    cout << " - Keyword search\n";
+    cout << " - Autocompletion\n";
+    cout << " - Typo correction\n";
+    cout << " - Ranked Tf-IDF results\n";
+    cout << " - 'exit' to quit\n\n";
+
     cout << "Indexing documents from './data/'...\n";
     Indexer indexer;
     Trie autoComplete;
