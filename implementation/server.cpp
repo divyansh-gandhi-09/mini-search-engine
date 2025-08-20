@@ -5,7 +5,7 @@
 #include <string>
 
 #include "../third_party/httplib.h"      // cpp-httplib single header
-#include "../third_party/json.hpp"        // nlohmann/json single header
+#include "../third_party/json.hpp"       // nlohmann/json single header
 
 #include "parser.h"
 #include "indexer.h"
@@ -21,15 +21,13 @@ int main() {
     std::cout << "\n------ Mini Search Engine (Web) ------\n";
     std::cout << "Indexing documents from './data/'...\n";
 
-    // Build your engine (same as your console app)
     Indexer indexer;
     Trie autoComplete;
     BKTree typoCorrector;
     std::unordered_map<int, std::string> docIdToPath;
-    std::unordered_map<int, std::string> docIdToRel; // "file.txt"
+    std::unordered_map<int, std::string> docIdToRel;
     int docID = 0;
 
-    // Load docs
     for (const auto& entry : fs::directory_iterator("./data")) {
         if (!entry.is_regular_file()) continue;
         std::string path = entry.path().string();
@@ -44,7 +42,7 @@ int main() {
         }
 
         docIdToPath[docID] = path;
-        docIdToRel[docID]  = entry.path().filename().string(); // for clickable link
+        docIdToRel[docID]  = entry.path().filename().string();
         ++docID;
     }
 
@@ -53,10 +51,8 @@ int main() {
 
     std::cout << "Indexing complete. " << docID << " documents indexed.\n";
 
-    // ---- HTTP server ----
     httplib::Server svr;
 
-    // Serve static frontend from ./public and documents from ./data
     svr.set_mount_point("/", "./public");
     svr.set_mount_point("/data", "./data");
     svr.set_file_extension_and_mimetype_mapping("js", "text/javascript");
@@ -70,12 +66,10 @@ int main() {
         res.status = 200;
     });
 
-    // Health check
     svr.Get("/health", [](const httplib::Request&, httplib::Response& res){
         res.set_content("OK", "text/plain");
     });
 
-    // Autocomplete: /suggest?prefix=cl
     svr.Get("/suggest", [&](const httplib::Request& req, httplib::Response& res){
         if (!req.has_param("prefix")) {
             res.status = 400;
@@ -89,7 +83,6 @@ int main() {
         res.set_content(j.dump(), "application/json");
     });
 
-    // Typo correction: /correct?word=climte&max=2
     svr.Get("/correct", [&](const httplib::Request& req, httplib::Response& res){
         if (!req.has_param("word")) {
             res.status = 400;
@@ -107,7 +100,7 @@ int main() {
         res.set_content(j.dump(), "application/json");
     });
 
-    // Search: /search?query=climate change
+    // 🔹 Search with preview
     svr.Get("/search", [&](const httplib::Request& req, httplib::Response& res){
         if (!req.has_param("query")) {
             res.status = 400;
@@ -115,18 +108,48 @@ int main() {
             return;
         }
         std::string q = req.get_param_value("query");
-        auto ranked = engine.search(q, Ranker()); // uses your existing SearchEngine
+        auto ranked = engine.search(q, Ranker());
 
         json arr = json::array();
         for (auto& [id, score] : ranked) {
             json item;
             item["id"]    = id;
             item["path"]  = docIdToPath[id];
-            item["url"]   = std::string("/data/") + docIdToRel[id]; // clickable in browser
+            item["url"]   = std::string("/data/") + docIdToRel[id];
             item["score"] = score;
+
+            // Preview snippet (first 200 chars)
+            std::string content = Parser::readFile(docIdToPath[id]);
+            if (content.size() > 200) content = content.substr(0, 200) + "...";
+            item["preview"] = content;
+
             arr.push_back(item);
         }
         res.set_content(arr.dump(), "application/json");
+    });
+
+    // 🔹 Full document fetch
+    svr.Get("/document", [&](const httplib::Request& req, httplib::Response& res){
+        if (!req.has_param("id")) {
+            res.status = 400;
+            res.set_content(R"({"error":"missing 'id'"})", "application/json");
+            return;
+        }
+        int id = std::stoi(req.get_param_value("id"));
+        if (docIdToPath.find(id) == docIdToPath.end()) {
+            res.status = 404;
+            res.set_content(R"({"error":"document not found"})", "application/json");
+            return;
+        }
+
+        std::string content = Parser::readFile(docIdToPath[id]);
+        json j;
+        j["id"] = id;
+        j["path"] = docIdToPath[id];
+        j["url"] = std::string("/data/") + docIdToRel[id];
+        j["content"] = content;
+
+        res.set_content(j.dump(), "application/json");
     });
 
     std::cout << "Server running at http://localhost:8080\n";

@@ -5,7 +5,6 @@ const corrEl = $("#corrections");
 const input = $("#search-box");
 const form = $("#search-form");
 
-// simple debounce to avoid spamming the server
 function debounce(fn, ms = 200) {
   let t;
   return (...args) => {
@@ -28,7 +27,6 @@ function renderPills(container, label, items, className) {
   container.innerHTML = `<span class="muted">${label}</span> ` + items
     .map(w => `<span class="pill ${className}" data-val="${w}">${w}</span>`)
     .join(" ");
-  // click to fill input and search
   container.querySelectorAll(".pill").forEach(el => {
     el.addEventListener("click", () => {
       input.value = el.dataset.val;
@@ -47,8 +45,40 @@ function renderResults(arr) {
       <div class="score">score: ${r.score.toFixed(3)}</div>
       <div><a href="${r.url}" target="_blank">${r.url}</a></div>
       <div class="muted">${r.path}</div>
+      <p class="preview">${r.preview}</p>
+      <button class="view-btn" data-id="${r.id}">View Full Document</button>
     </div>
   `).join("");
+
+  document.querySelectorAll(".view-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      try {
+        const doc = await fetchJSON(`/document?id=${id}`);
+        showModal(doc);
+      } catch (e) {
+        alert("Error loading document: " + e.message);
+      }
+    });
+  });
+}
+
+function showModal(doc) {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>${doc.url}</h2>
+      <pre class="doc-text">${doc.content}</pre>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector(".close").onclick = () => modal.remove();
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 const liveAssist = debounce(async () => {
@@ -58,17 +88,15 @@ const liveAssist = debounce(async () => {
     corrEl.innerHTML = "";
     return;
   }
-  // suggestions
   try {
     const s = await fetchJSON(`/suggest?prefix=${encodeURIComponent(q)}`);
     renderPills(suggEl, "Suggestions:", s, "suggestion");
-  } catch (e) { /* ignore */ }
+  } catch (e) {}
 
-  // corrections
   try {
     const c = await fetchJSON(`/correct?word=${encodeURIComponent(q)}&max=2`);
     renderPills(corrEl, "Did you mean:", c, "correction");
-  } catch (e) { /* ignore */ }
+  } catch (e) {}
 }, 150);
 
 input.addEventListener("input", liveAssist);
