@@ -1,10 +1,8 @@
 * { box-sizing: border-box; }
 body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #f7f8fb; margin: 0; color: #222; }
 .container { max-width: 900px; margin: 48px auto; padding: 0 16px; }
-h1 { margin-bottom: 12px; }
-h2 { margin: 24px 0 8px; }
 
-form { display: flex; gap: 8px; }
+form { display: flex; gap: 8px; margin-bottom: 20px; }
 #search-box { flex: 1; padding: 12px 14px; font-size: 16px; border: 1px solid #d7dbe4; border-radius: 10px; outline: none; }
 button { padding: 12px 16px; border: 0; border-radius: 10px; cursor: pointer; background: #1f6feb; color: white; font-weight: 600; }
 button:hover { filter: brightness(0.95); }
@@ -13,7 +11,7 @@ button:hover { filter: brightness(0.95); }
 .pill { display: inline-block; margin: 4px 6px 0 0; padding: 6px 10px; border-radius: 999px; background: #e9eef9; color: #2b4ea2; cursor: pointer; user-select: none; }
 .pill:hover { background: #dfe7fb; }
 
-.result { background: white; padding: 12px 14px; margin: 10px 0; border-radius: 10px; border: 1px solid #eef0f4; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.result { background: white; padding: 16px 18px; margin: 16px 0; border-radius: 12px; border: 1px solid #eef0f4; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 .result a { text-decoration: none; color: #1f6feb; }
 .muted { color: #6b7280; font-size: 14px; }
 .score { float: right; color: #334155; font-weight: 600; }
@@ -75,7 +73,15 @@ button:hover { filter: brightness(0.95); }
   font-size: 15px;
   line-height: 1.5;
   margin-top: 12px;
+
+  /* Match preview style */
+  color: #374151;
+  background: #f9fafb;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border-left: 3px solid #1f6feb;
 }
+
 .view-btn {
   margin-top: 8px;
   padding: 8px 12px;
@@ -88,4 +94,74 @@ button:hover { filter: brightness(0.95); }
 }
 .view-btn:hover {
   background: #059669;
+}
+
+/* Info Modal specific styles */
+.info-heading {
+  font-size: 20px;
+  color: #1f2937;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 6px;
+}
+
+.info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.info-list li {
+  margin-bottom: 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #374151;
+}
+.info-list strong {
+  color: #1f6feb;
+}
+
+.info-btn {
+  background: #f3f4f6;
+  color: #1f2937;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-left: 8px;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.info-btn:hover {
+  background: #e5e7eb;
+}
+
+/* Main page heading */
+.main-heading {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 40px; /* more breathing room below the title */
+  text-align: center;
+  letter-spacing: -0.5px;
+}
+
+/* Section Headings */
+.section-heading {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 36px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
+  letter-spacing: 0.3px;
+}
+/* Highlighted search terms */
+.preview b u,
+.doc-text b u {
+  font-weight: 700;
+  color: #1f6feb;              /* GitHub blue shade */
+  text-decoration: underline;
+  text-decoration-color: #1f6feb;
+  text-decoration-thickness: 2px; /* thinner underline */
+  text-underline-offset: 2px;     /* spacing from text */
 }
