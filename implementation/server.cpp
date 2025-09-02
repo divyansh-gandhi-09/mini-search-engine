@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <memory> // for std::unique_ptr
 
 #include "../third_party/httplib.h"
 #include "../third_party/json.hpp"
@@ -73,7 +74,6 @@ int main() {
     };
 
     // ---------------- Initial Indexing ----------------
-    // Create data directory if it doesn't exist
     if (!fs::exists("./data")) {
         fs::create_directory("./data");
         std::cout << "Created ./data directory\n";
@@ -91,13 +91,13 @@ int main() {
     }
 
     auto index = indexer.getIndex();
-    SearchEngine engine(index, docID);
+    std::unique_ptr<SearchEngine> engine = std::make_unique<SearchEngine>(index, docID);
 
     std::cout << "Indexing complete. " << docID << " documents indexed.\n";
 
     httplib::Server svr;
 
-    // Enable CORS for all routes
+    // Enable CORS
     svr.set_pre_routing_handler([](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -105,33 +105,27 @@ int main() {
         return httplib::Server::HandlerResponse::Unhandled;
     });
 
-    // Handle preflight requests
-    svr.Options(".*", [](const httplib::Request&, httplib::Response& res) {
-        return;
-    });
-
-    // Serve static files
+    svr.Options(".*", [](const httplib::Request&, httplib::Response& res) { return; });
     svr.set_mount_point("/", "./public");
 
-    // ---------------- Health Check ----------------
+    // ---------------- Health ----------------
     svr.Get("/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content(R"({"status":"ok"})", "application/json");
     });
 
-    // ---------------- Auto-complete suggestions ----------------
+    // ---------------- Suggest ----------------
     svr.Get("/suggest", [&](const httplib::Request& req, httplib::Response& res) {
         auto prefix = req.get_param_value("prefix");
         if (prefix.empty()) {
             res.set_content("[]", "application/json");
             return;
         }
-
-        auto suggestions = autoComplete.suggest(prefix); // Remove second parameter
+        auto suggestions = autoComplete.suggest(prefix);
         json j = suggestions;
         res.set_content(j.dump(), "application/json");
     });
 
-    // ---------------- Typo correction ----------------
+    // ---------------- Correct ----------------
     svr.Get("/correct", [&](const httplib::Request& req, httplib::Response& res) {
         auto word = req.get_param_value("word");
         auto maxStr = req.get_param_value("max");
@@ -142,13 +136,11 @@ int main() {
             return;
         }
 
-        auto corrections = typoCorrector.search(word, 2); // Use correct method name and parameters
-        
-        // Limit results if needed
+        auto corrections = typoCorrector.search(word, 2);
         if (corrections.size() > maxResults) {
             corrections.resize(maxResults);
         }
-        
+
         json j = corrections;
         res.set_content(j.dump(), "application/json");
     });
@@ -162,12 +154,12 @@ int main() {
         }
 
         try {
-            Ranker ranker; // Create ranker instance
-            auto results = engine.search(query, ranker); // Pass ranker as second parameter
+            Ranker ranker;
+            auto results = engine->search(query, ranker);
             json j = json::array();
 
             for (const auto& result : results) {
-                std::string content = Parser::readFile(docIdToPath[result.first]); // result.first is docId
+                std::string content = Parser::readFile(docIdToPath[result.first]);
                 std::string preview = content.length() > 200 ? 
                     content.substr(0, 200) + "..." : content;
 
@@ -189,7 +181,7 @@ int main() {
         }
     });
 
-    // ---------------- Get full document ----------------
+    // ---------------- Document ----------------
     svr.Get("/document", [&](const httplib::Request& req, httplib::Response& res) {
         auto idStr = req.get_param_value("id");
         if (idStr.empty()) {
@@ -222,7 +214,7 @@ int main() {
         }
     });
 
-    // ---------------- Upload new file ----------------
+    // ---------------- Upload ----------------
     svr.Post("/upload", [&](const httplib::Request& req, httplib::Response& res) {
         try {
             auto body = json::parse(req.body);
@@ -235,14 +227,12 @@ int main() {
             std::string filename = body["filename"];
             std::string content = body["content"];
 
-            // Validate filename
             if (filename.empty() || content.empty()) {
                 res.status = 400;
                 res.set_content(R"({"error":"filename and content cannot be empty"})", "application/json");
                 return;
             }
 
-            // Ensure data directory exists
             if (!fs::exists("./data")) {
                 fs::create_directory("./data");
             }
@@ -261,6 +251,10 @@ int main() {
             int newId = docID++;
             indexSingleDocument(newId, path, content);
 
+            // 🔄 rebuild search engine
+            auto newIndex = indexer.getIndex();
+            engine = std::make_unique<SearchEngine>(newIndex, docID);
+
             json response = {
                 {"status", "uploaded"},
                 {"id", newId},
@@ -274,7 +268,7 @@ int main() {
         }
     });
 
-    // ---------------- Edit existing file ----------------
+    // ---------------- Edit ----------------
     svr.Put(R"(/edit/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
         try {
             int id = std::stoi(req.matches[1]);
@@ -292,26 +286,26 @@ int main() {
             }
 
             std::string newContent = body["content"];
-            
             if (newContent.empty()) {
                 res.status = 400;
                 res.set_content(R"({"error":"content cannot be empty"})", "application/json");
                 return;
             }
 
-            // Overwrite file
             std::ofstream ofs(docIdToPath[id]);
             if (!ofs.is_open()) {
                 res.status = 500;
                 res.set_content(R"({"error":"failed to write file"})", "application/json");
                 return;
             }
-
             ofs << newContent;
             ofs.close();
 
-            // Re-index the document
             indexSingleDocument(id, docIdToPath[id], newContent);
+
+            // 🔄 rebuild search engine
+            auto newIndex = indexer.getIndex();
+            engine = std::make_unique<SearchEngine>(newIndex, docID);
 
             json response = {
                 {"status", "updated"},
@@ -328,7 +322,6 @@ int main() {
     std::cout << "Server running at http://localhost:8080\n";
     std::cout << "Access the web interface at: http://localhost:8080/index.html\n";
     
-    // Start the server
     if (!svr.listen("0.0.0.0", 8080)) {
         std::cerr << "Failed to start server on port 8080\n";
         return 1;
