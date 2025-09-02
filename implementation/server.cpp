@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <algorithm>   // 🔹 needed for std::transform 
 
 #include "../third_party/httplib.h"      // cpp-httplib single header
 #include "../third_party/json.hpp"       // nlohmann/json single header
@@ -16,6 +17,29 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+// 🔹 Helper to underline + bold occurrences of query in text
+std::string highlightText(const std::string& text, const std::string& query) {
+    if (query.empty()) return text;
+
+    std::string lowerText = text;
+    std::string lowerQuery = query;
+
+    std::transform(lowerText.begin(), lowerText.end(), lowerText.begin(), ::tolower);
+    std::transform(lowerQuery.begin(), lowerQuery.end(), lowerQuery.begin(), ::tolower);
+
+    std::string result;
+    size_t pos = 0, start = 0;
+    while ((pos = lowerText.find(lowerQuery, start)) != std::string::npos) {
+        result.append(text.substr(start, pos - start));
+        result.append("<u><b>");
+        result.append(text.substr(pos, query.size()));
+        result.append("</b></u>");
+        start = pos + query.size();
+    }
+    result.append(text.substr(start));
+    return result;
+}
 
 int main() {
     std::cout << "\n------ Mini Search Engine (Web) ------\n";
@@ -100,7 +124,7 @@ int main() {
         res.set_content(j.dump(), "application/json");
     });
 
-    // 🔹 Search with preview
+    // 🔹 Search with preview (now underline + bold, not <mark>)
     svr.Get("/search", [&](const httplib::Request& req, httplib::Response& res){
         if (!req.has_param("query")) {
             res.status = 400;
@@ -118,17 +142,17 @@ int main() {
             item["url"]   = std::string("/data/") + docIdToRel[id];
             item["score"] = score;
 
-            // Preview snippet (first 200 chars)
+            // Preview snippet (first 200 chars, underlined + bolded)
             std::string content = Parser::readFile(docIdToPath[id]);
             if (content.size() > 200) content = content.substr(0, 200) + "...";
-            item["preview"] = content;
+            item["preview"] = highlightText(content, q);
 
             arr.push_back(item);
         }
         res.set_content(arr.dump(), "application/json");
     });
 
-    // 🔹 Full document fetch
+    // 🔹 Full document fetch (also underline + bold)
     svr.Get("/document", [&](const httplib::Request& req, httplib::Response& res){
         if (!req.has_param("id")) {
             res.status = 400;
@@ -148,6 +172,11 @@ int main() {
         j["path"] = docIdToPath[id];
         j["url"] = std::string("/data/") + docIdToRel[id];
         j["content"] = content;
+
+        // also send highlighted content if query param present
+        if (req.has_param("query")) {
+            j["highlighted"] = highlightText(content, req.get_param_value("query"));
+        }
 
         res.set_content(j.dump(), "application/json");
     });

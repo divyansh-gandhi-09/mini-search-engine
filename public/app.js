@@ -24,10 +24,15 @@ function renderPills(container, label, items, className) {
     container.innerHTML = "";
     return;
   }
-  container.innerHTML = `<span class="muted">${label}</span> ` + items
-    .map(w => `<span class="pill ${className}" data-val="${w}">${w}</span>`)
-    .join(" ");
-  container.querySelectorAll(".pill").forEach(el => {
+  container.innerHTML =
+    `<span class="muted">${label}</span> ` +
+    items
+      .map(
+        (w) =>
+          `<span class="pill ${className}" data-val="${w}">${w}</span>`
+      )
+      .join(" ");
+  container.querySelectorAll(".pill").forEach((el) => {
     el.addEventListener("click", () => {
       input.value = el.dataset.val;
       performSearch();
@@ -40,21 +45,34 @@ function renderResults(arr) {
     resultsEl.innerHTML = `<div class="muted">No results.</div>`;
     return;
   }
-  resultsEl.innerHTML = arr.map(r => `
+  resultsEl.innerHTML = arr
+    .map(
+      (r) => `
     <div class="result">
       <div class="score">score: ${r.score.toFixed(3)}</div>
       <div><a href="${r.url}" target="_blank">${r.url}</a></div>
       <div class="muted">${r.path}</div>
-      <p class="preview">${r.preview}</p>
+      <p class="preview" data-id="${r.id}"></p>
       <button class="view-btn" data-id="${r.id}">View Full Document</button>
     </div>
-  `).join("");
+  `
+    )
+    .join("");
 
-  document.querySelectorAll(".view-btn").forEach(btn => {
+  // Insert highlighted HTML for previews
+  arr.forEach((r) => {
+    const previewEl = resultsEl.querySelector(`.preview[data-id="${r.id}"]`);
+    if (previewEl) previewEl.innerHTML = r.preview;
+  });
+
+  document.querySelectorAll(".view-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       try {
-        const doc = await fetchJSON(`/document?id=${id}`);
+        const q = input.value.trim();
+        const doc = await fetchJSON(
+          `/document?id=${id}&query=${encodeURIComponent(q)}`
+        );
         showModal(doc);
       } catch (e) {
         alert("Error loading document: " + e.message);
@@ -70,10 +88,14 @@ function showModal(doc) {
     <div class="modal-content">
       <span class="close">&times;</span>
       <h2>${doc.url}</h2>
-      <pre class="doc-text">${doc.content}</pre>
+      <pre class="doc-text">${doc.highlighted ? doc.highlighted : doc.content}</pre>
     </div>
   `;
   document.body.appendChild(modal);
+
+  // Allow HTML highlights to render
+  modal.querySelector(".doc-text").innerHTML =
+    doc.highlighted || doc.content;
 
   modal.querySelector(".close").onclick = () => modal.remove();
   modal.addEventListener("click", (e) => {
@@ -94,7 +116,9 @@ const liveAssist = debounce(async () => {
   } catch (e) {}
 
   try {
-    const c = await fetchJSON(`/correct?word=${encodeURIComponent(q)}&max=2`);
+    const c = await fetchJSON(
+      `/correct?word=${encodeURIComponent(q)}&max=2`
+    );
     renderPills(corrEl, "Did you mean:", c, "correction");
   } catch (e) {}
 }, 150);
