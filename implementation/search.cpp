@@ -42,7 +42,7 @@ vector<pair<int, double>> SearchEngine::search(const string& query, const Ranker
         vector<unordered_set<int>> termDocSets;
         for (const string& term : terms) {
             unordered_set<int> docs;
-            auto ranked = ranker.rank(term, invertedIndex, totalDocuments);
+            auto ranked = Ranker::rank(term, invertedIndex, totalDocuments);
             for (auto& [docID, _] : ranked)
                 docs.insert(docID);
             termDocSets.push_back(docs);
@@ -60,7 +60,7 @@ vector<pair<int, double>> SearchEngine::search(const string& query, const Ranker
 
         // Only score common docs
         for (const string& term : terms) {
-            auto ranked = ranker.rank(term, invertedIndex, totalDocuments);
+            auto ranked = Ranker::rank(term, invertedIndex, totalDocuments);
             for (auto& [docID, score] : ranked) {
                 if (commonDocs.count(docID)) {
                     docScores[docID] += score;
@@ -70,7 +70,7 @@ vector<pair<int, double>> SearchEngine::search(const string& query, const Ranker
     } else {
         // OR or single term logic
         for (const string& term : terms) {
-            auto ranked = ranker.rank(term, invertedIndex, totalDocuments);
+            auto ranked = Ranker::rank(term, invertedIndex, totalDocuments);
             for (auto& [docID, score] : ranked) {
                 docScores[docID] += score;
             }

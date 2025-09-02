@@ -82,18 +82,38 @@ button:hover { filter: brightness(0.95); }
   border-left: 3px solid #1f6feb;
 }
 
+/* ✅ FIXED: Consistent action button styling */
+.action-btn {
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 120px !important; /* Ensures consistent width */
+  text-align: center !important;
+}
+
 .view-btn {
-  margin-top: 8px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 8px;
-  background: #10b981;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
+  background: #10b981 !important;
+  color: white !important;
 }
 .view-btn:hover {
-  background: #059669;
+  background: #059669 !important;
+  transform: translateY(-1px);
+}
+
+.edit-btn {
+  background: #1f6feb !important;
+  color: white !important;
+}
+.edit-btn:hover {
+  background: #1559c9 !important;
+  transform: translateY(-1px);
 }
 
 /* Info Modal specific styles */
@@ -155,6 +175,7 @@ button:hover { filter: brightness(0.95); }
   border-bottom: 2px solid #e5e7eb;
   letter-spacing: 0.3px;
 }
+
 /* Highlighted search terms */
 .preview b u,
 .doc-text b u {
@@ -164,4 +185,52 @@ button:hover { filter: brightness(0.95); }
   text-decoration-color: #1f6feb;
   text-decoration-thickness: 2px; /* thinner underline */
   text-underline-offset: 2px;     /* spacing from text */
+}
+
+/* Upload & Edit forms */
+.action-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.action-form input,
+.action-form textarea {
+  padding: 12px 14px;
+  font-size: 15px;
+  border: 1px solid #d7dbe4;
+  border-radius: 10px;
+  outline: none;
+  resize: vertical;
+}
+
+.action-form textarea {
+  min-height: 120px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.action-form button {
+  align-self: flex-start;
+  background: #1f6feb;
+  color: white;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-form button:hover {
+  background: #1559c9;
+}
+
+/* ✅ FIXED: Result action buttons container */
+.result-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }

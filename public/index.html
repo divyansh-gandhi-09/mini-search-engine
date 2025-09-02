@@ -23,6 +23,22 @@
     <!-- Results Section -->
     <h2 class="section-heading">📄 Search Results</h2>
     <div id="results"></div>
+
+    <!-- Upload Section -->
+    <h2 class="section-heading">📤 Upload New Document</h2>
+    <form id="upload-form" class="action-form">
+      <input id="upload-filename" type="text" placeholder="Filename (e.g. notes.txt)" required />
+      <textarea id="upload-content" placeholder="Document content..." required></textarea>
+      <button type="submit">Upload</button>
+    </form>
+
+    <!-- Edit Section -->
+    <h2 class="section-heading">✏️ Edit Existing Document</h2>
+    <form id="edit-form" class="action-form">
+      <input id="edit-id" type="number" placeholder="Document ID" required />
+      <textarea id="edit-content" placeholder="New content..." required></textarea>
+      <button type="submit">Save Changes</button>
+    </form>
   </main>
 
   <script src="app.js"></script>
