@@ -318,6 +318,58 @@ int main() {
             res.set_content(error.dump(), "application/json");
         }
     });
+    // --- List all documents ---
+svr.Get("/documents", [&](const httplib::Request &req, httplib::Response &res) {
+    json j;
+    for (auto &[id, relPath] : docIdToRel) {
+        std::ifstream file(docIdToPath[id]);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        j.push_back({
+            {"id", id},
+            {"url", relPath},
+            {"content", buffer.str().substr(0, 200)} // preview first 200 chars
+        });
+    }
+    res.set_content(j.dump(), "application/json");
+});
+
+// --- Delete document ---
+svr.Delete(R"(/delete/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
+    try {
+        int id = std::stoi(req.matches[1]);
+        if (docIdToPath.find(id) == docIdToPath.end()) {
+            res.status = 404;
+            res.set_content(R"({"error":"document not found"})", "application/json");
+            return;
+        }
+
+        std::string path = docIdToPath[id];
+        if (fs::exists(path)) fs::remove(path);
+
+        docIdToPath.erase(id);
+        docIdToRel.erase(id);
+
+        // 🔄 Rebuild index
+        indexer = Indexer();
+        for (auto &[docId, path2] : docIdToPath) {
+            std::ifstream f(path2);
+            std::stringstream buf;
+            buf << f.rdbuf();
+            indexer.indexDocument(docId, buf.str());
+
+        }
+        engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+
+        json response = {{"status","deleted"},{"id",id}};
+        res.set_content(response.dump(), "application/json");
+    } catch (const std::exception& e) {
+        res.status = 500;
+        json error = {{"error", std::string("delete failed: ") + e.what()}};
+        res.set_content(error.dump(), "application/json");
+    }
+});
+
 
     std::cout << "Server running at http://localhost:8080\n";
     std::cout << "Access the web interface at: http://localhost:8080/index.html\n";

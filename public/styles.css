@@ -234,3 +234,11 @@ button:hover { filter: brightness(0.95); }
   justify-content: flex-start;
   flex-wrap: wrap;
 }
+.delete-btn {
+  background: #ef4444 !important;
+  color: white !important;
+}
+.delete-btn:hover {
+  background: #dc2626 !important;
+  transform: translateY(-1px);
+}

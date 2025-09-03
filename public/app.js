@@ -13,16 +13,16 @@ function debounce(fn, ms = 200) {
   };
 }
 
-async function fetchJSON(url) {
+async function fetchJSON(url, options = {}) {
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, options);
     if (!r.ok) {
       const errorText = await r.text();
       throw new Error(`HTTP ${r.status}: ${errorText}`);
     }
     return r.json();
   } catch (error) {
-    console.error('Fetch error:', error);
+    console.error("Fetch error:", error);
     throw error;
   }
 }
@@ -55,7 +55,10 @@ function highlightText(text, query) {
   const reserved = ["and", "or"];
   const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  const terms = query.trim().split(/\s+/).filter(t => !reserved.includes(t.toLowerCase()));
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((t) => !reserved.includes(t.toLowerCase()));
 
   let highlighted = text;
   terms.forEach((term) => {
@@ -77,15 +80,16 @@ function renderResults(arr) {
     .map(
       (r) => `
     <div class="result">
-      <div class="score">score: ${r.score.toFixed(3)}</div>
-      <div><a href="#" onclick="return false;">${r.url}</a></div>
-      <div class="muted">${r.path}</div>
+      <div class="score">score: ${r.score ? r.score.toFixed(3) : "-"}</div>
+      <div><a href="#" onclick="return false;">${r.url || r.filename}</a></div>
+      <div class="muted">${r.path || ""}</div>
       <p class="preview" data-id="${r.id}">
-        ${highlightText(r.preview, q)}
+        ${highlightText(r.preview || r.content?.slice(0, 200) || "", q)}
       </p>
       <div class="result-actions">
         <button class="action-btn view-btn" data-id="${r.id}">View Full Document</button>
         <button class="action-btn edit-btn" data-id="${r.id}">Edit</button>
+        <button class="action-btn delete-btn" data-id="${r.id}">Delete</button>
       </div>
     </div>
   `
@@ -113,9 +117,33 @@ function renderResults(arr) {
         const doc = await fetchJSON(`/document?id=${id}`);
         $("#edit-id").value = id;
         $("#edit-content").value = doc.content;
-        document.querySelector("#edit-form").scrollIntoView({ behavior: "smooth" });
+        document
+          .querySelector("#edit-form")
+          .scrollIntoView({ behavior: "smooth" });
       } catch (e) {
         alert("Error loading document for edit: " + e.message);
+      }
+    });
+  });
+
+  // ❌ Delete document
+  document.querySelectorAll(".delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if (!confirm(`Are you sure you want to delete document ${id}?`)) return;
+
+      try {
+        await fetchJSON(`/delete/${id}`, { method: "DELETE" });
+        alert(`🗑️ Document ${id} deleted successfully!`);
+        // Refresh results
+        const currentQuery = input.value.trim();
+        if (currentQuery) {
+          performSearch();
+        } else {
+          listAllDocuments();
+        }
+      } catch (e) {
+        alert("Delete failed: " + e.message);
       }
     });
   });
@@ -128,8 +156,8 @@ function showModal(doc, query) {
   modal.innerHTML = `
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h2>${doc.url}</h2>
-      <div class="muted">Path: ${doc.path}</div>
+      <h2>${doc.url || doc.filename}</h2>
+      <div class="muted">Path: ${doc.path || ""}</div>
       <pre class="doc-text">${highlightText(doc.content, query)}</pre>
     </div>
   `;
@@ -142,12 +170,12 @@ function showModal(doc, query) {
 
   // Close modal on Escape key
   const handleEscape = (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       modal.remove();
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("keydown", handleEscape);
     }
   };
-  document.addEventListener('keydown', handleEscape);
+  document.addEventListener("keydown", handleEscape);
 }
 
 // ---------- Suggestions + Corrections ----------
@@ -159,23 +187,21 @@ const liveAssist = debounce(async () => {
     return;
   }
 
-  // Get suggestions
   try {
     const s = await fetchJSON(`/suggest?prefix=${encodeURIComponent(q)}`);
     renderPills(suggEl, "Suggestions:", s, "suggestion");
   } catch (e) {
-    console.error('Suggestion error:', e);
+    console.error("Suggestion error:", e);
   }
 
-  // Get corrections (only for single words to avoid noise)
-  if (!q.includes(' ')) {
+  if (!q.includes(" ")) {
     try {
       const c = await fetchJSON(
         `/correct?word=${encodeURIComponent(q)}&max=3`
       );
       renderPills(corrEl, "Did you mean:", c, "correction");
     } catch (e) {
-      console.error('Correction error:', e);
+      console.error("Correction error:", e);
     }
   } else {
     corrEl.innerHTML = "";
@@ -191,11 +217,21 @@ async function performSearch() {
     return;
   }
 
-  // Show loading state
   resultsEl.innerHTML = `<div class="muted">Searching...</div>`;
 
   try {
     const data = await fetchJSON(`/search?query=${encodeURIComponent(q)}`);
+    renderResults(data);
+  } catch (e) {
+    resultsEl.innerHTML = `<div class="muted">Error: ${e.message}</div>`;
+  }
+}
+
+// ---------- 📄 List All Documents ----------
+async function listAllDocuments() {
+  resultsEl.innerHTML = `<div class="muted">Loading documents...</div>`;
+  try {
+    const data = await fetchJSON("/documents");
     renderResults(data);
   } catch (e) {
     resultsEl.innerHTML = `<div class="muted">Error: ${e.message}</div>`;
@@ -232,17 +268,15 @@ function showInfoModal() {
     if (e.target === modal) modal.remove();
   });
 
-  // Close on Escape
   const handleEscape = (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       modal.remove();
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("keydown", handleEscape);
     }
   };
-  document.addEventListener('keydown', handleEscape);
+  document.addEventListener("keydown", handleEscape);
 }
 
-// Add info button next to search form
 const infoBtn = document.createElement("button");
 infoBtn.type = "button";
 infoBtn.className = "info-btn";
@@ -251,8 +285,6 @@ infoBtn.onclick = showInfoModal;
 document.querySelector("#search-form").appendChild(infoBtn);
 
 // ---------- Upload & Edit ----------
-
-// Upload new document
 async function uploadDocument(filename, content) {
   const res = await fetch("/upload", {
     method: "POST",
@@ -266,7 +298,6 @@ async function uploadDocument(filename, content) {
   return res.json();
 }
 
-// Edit existing document
 async function editDocument(id, newContent) {
   const res = await fetch(`/edit/${id}`, {
     method: "PUT",
@@ -280,7 +311,6 @@ async function editDocument(id, newContent) {
   return res.json();
 }
 
-// Handle upload form
 $("#upload-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const filename = $("#upload-filename").value.trim();
@@ -291,31 +321,31 @@ $("#upload-form").addEventListener("submit", async (e) => {
     return;
   }
 
-  // Validate filename
-  if (filename.includes('/') || filename.includes('\\')) {
+  if (filename.includes("/") || filename.includes("\\")) {
     alert("Filename cannot contain path separators.");
     return;
   }
 
   try {
-    // Show loading state
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = "Uploading...";
     submitBtn.disabled = true;
 
     const res = await uploadDocument(filename, content);
-    alert(`✅ Uploaded successfully!\nFile: ${res.filename}\nDocument ID: ${res.id}`);
+    alert(
+      `✅ Uploaded successfully!\nFile: ${res.filename}\nDocument ID: ${res.id}`
+    );
     $("#upload-form").reset();
-    
-    // ✅ CRITICAL FIX: Force refresh search results AND suggestions
+
     const currentQuery = input.value.trim();
     if (currentQuery) {
-      // Small delay to ensure server has processed the new document
       setTimeout(async () => {
         await performSearch();
-        await liveAssist(); // Refresh suggestions too
+        await liveAssist();
       }, 100);
+    } else {
+      listAllDocuments();
     }
 
     submitBtn.textContent = originalText;
@@ -327,7 +357,6 @@ $("#upload-form").addEventListener("submit", async (e) => {
   }
 });
 
-// Handle edit form
 $("#edit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = $("#edit-id").value.trim();
@@ -344,7 +373,6 @@ $("#edit-form").addEventListener("submit", async (e) => {
   }
 
   try {
-    // Show loading state
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = "Saving...";
@@ -353,15 +381,15 @@ $("#edit-form").addEventListener("submit", async (e) => {
     const res = await editDocument(id, content);
     alert(`✏️ Document edited successfully! (ID: ${res.id})`);
     $("#edit-form").reset();
-    
-    // ✅ CRITICAL FIX: Force refresh search results AND suggestions
+
     const currentQuery = input.value.trim();
     if (currentQuery) {
-      // Small delay to ensure server has processed the updated document
       setTimeout(async () => {
         await performSearch();
-        await liveAssist(); // Refresh suggestions too
+        await liveAssist();
       }, 100);
+    } else {
+      listAllDocuments();
     }
 
     submitBtn.textContent = originalText;
@@ -369,21 +397,28 @@ $("#edit-form").addEventListener("submit", async (e) => {
   } catch (err) {
     alert("Edit failed: " + err.message);
     e.target.querySelector('button[type="submit"]').disabled = false;
-    e.target.querySelector('button[type="submit"]').textContent = "Save Changes";
+    e.target.querySelector('button[type="submit"]').textContent =
+      "Save Changes";
   }
 });
 
 // ---------- Initialize ----------
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('Mini Search Engine initialized');
-  
-  // Focus search box on load
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("Mini Search Engine initialized");
   input.focus();
-  
-  // Handle keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    // Ctrl+K or Cmd+K to focus search
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+  // Hook up "Show All" button
+document.querySelector("#all-btn").addEventListener("click", listAllDocuments);
+/*
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.id = "all-btn";
+  allBtn.className = "info-btn";
+  allBtn.textContent = "📄 Show All";
+  allBtn.onclick = listAllDocuments;
+  document.querySelector("#search-form").appendChild(allBtn);
+*/
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "k") {
       e.preventDefault();
       input.focus();
       input.select();
