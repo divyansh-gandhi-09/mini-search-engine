@@ -1,4 +1,4 @@
 main.exe 
 server.exe
 /.vscode/**
-*.txt
+data/*.txt
