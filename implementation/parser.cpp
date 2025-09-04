@@ -12,15 +12,16 @@ string Parser::readFile(const string& filepath) {
 }
 vector<string> Parser::tokenize(const string& text) {
     vector<string> tokens;
+    tokens.reserve(text.size()/5); // heuristic to avoid frequent reallocations
     string word;
     for (char ch : text) {
-        if (isalnum(ch)) {
-            word += tolower(ch);
-        } else if (!word.empty()) {
-            tokens.push_back(word);
+        if (isalnum(ch)) word += (ch | 0x20); // faster lowercase for ASCII
+        else if (!word.empty()) {
+            tokens.push_back(move(word));
             word.clear();
         }
     }
-    if (!word.empty()) tokens.push_back(word);
+    if (!word.empty()) tokens.push_back(move(word));
     return tokens;
 }
+

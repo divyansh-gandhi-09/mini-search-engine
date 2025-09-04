@@ -4,7 +4,8 @@ using namespace std;
 void Indexer::indexDocument(int docID, const string& content) {
     vector<string> words = Parser::tokenize(content);
     for (const string& word : words) {
-        invertedIndex[word][docID]++;
+        auto &docMap = invertedIndex[word]; // get reference to inner map
+        docMap[docID]++;                   // increment count
     }
 }
 unordered_map<string, unordered_map<int, int>> Indexer::getIndex() {
