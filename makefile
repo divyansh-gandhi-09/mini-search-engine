@@ -3,9 +3,14 @@ CXX = g++
 CXXFLAGS = -std=c++20 -g -I"header files" -Ithird_party -MMD
 LDFLAGS = -lws2_32
 
-# Sources & objects
+# Source files
 SRC = $(wildcard implementation/*.cpp)
-OBJ = $(SRC:.cpp=.o)
+
+# Build folder
+BUILD_DIR = build
+
+# Object & dependency files in build/
+OBJ = $(patsubst implementation/%.cpp,$(BUILD_DIR)/%.o,$(SRC))
 DEP = $(OBJ:.o=.d)
 
 # Executable
@@ -18,14 +23,17 @@ all: $(SERVER)
 $(SERVER): $(OBJ)
 	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
 
-# Compile object files & generate dependency files
-implementation/%.o: implementation/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+# Compile object files & generate dependency files in build/
+$(BUILD_DIR)/%.o: implementation/%.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MP -MF $(BUILD_DIR)/$*.d
 
-# Include dependency files (auto-rebuild on header change)
+# Create build folder if it doesn't exist
+$(BUILD_DIR):
+	mkdir $(BUILD_DIR)
+
+# Include dependency files
 -include $(DEP)
 
 # Clean up
 clean:
-	del /Q implementation\*.o $(SERVER) 2>nul || true
-	del /Q implementation\*.d 2>nul || true
+	del /Q $(BUILD_DIR)\*.o $(BUILD_DIR)\*.d $(SERVER) 2>nul || true
