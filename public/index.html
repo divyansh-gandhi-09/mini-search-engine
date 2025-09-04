@@ -14,7 +14,7 @@
     <form id="search-form">
       <input id="search-box" type="text" placeholder="Type your query..." autocomplete="off" />
       <button type="submit">Search</button>
-      <!-- ✅ New Show All button -->
+      <!-- ✅ Show All button -->
       <button type="button" id="all-btn" class="info-btn">Show All</button>
     </form>
 
@@ -26,13 +26,15 @@
     <h2 class="section-heading">📄 Search Results</h2>
     <div id="results"></div>
 
-    <!-- Upload Section -->
-    <h2 class="section-heading">📤 Upload New Document</h2>
-    <form id="upload-form" class="action-form">
-      <input id="upload-filename" type="text" placeholder="Filename (e.g. notes.txt)" required />
-      <textarea id="upload-content" placeholder="Document content..." required></textarea>
-      <button type="submit">Upload</button>
-    </form>
+  <!-- Upload Section -->
+<h2 class="section-heading">📤 Upload New Document</h2>
+<form id="upload-form" class="action-form">
+  <input id="upload-filename" type="text" placeholder="Filename (e.g. notes.txt)" />
+  <textarea id="upload-content" placeholder="Document content..."></textarea>
+  <input id="upload-file" type="file" accept=".txt,.md,.csv,.log,.json" />
+  <button type="submit">Upload</button>
+</form>
+
 
     <!-- Edit Section -->
     <h2 class="section-heading">✏️ Edit Existing Document</h2>

@@ -135,7 +135,6 @@ function renderResults(arr) {
       try {
         await fetchJSON(`/delete/${id}`, { method: "DELETE" });
         alert(`🗑️ Document ${id} deleted successfully!`);
-        // Refresh results
         const currentQuery = input.value.trim();
         if (currentQuery) {
           performSearch();
@@ -168,7 +167,6 @@ function showModal(doc, query) {
     if (e.target === modal) modal.remove();
   });
 
-  // Close modal on Escape key
   const handleEscape = (e) => {
     if (e.key === "Escape") {
       modal.remove();
@@ -216,9 +214,7 @@ async function performSearch() {
     resultsEl.innerHTML = `<div class="muted">Enter a search query.</div>`;
     return;
   }
-
   resultsEl.innerHTML = `<div class="muted">Searching...</div>`;
-
   try {
     const data = await fetchJSON(`/search?query=${encodeURIComponent(q)}`);
     renderResults(data);
@@ -257,7 +253,8 @@ function showInfoModal() {
         <li><strong>Flexible Querying</strong> - Use <code>AND</code> / <code>OR</code> between words to refine results.</li>
         <li><strong>Relevant Ranking</strong> - Results are ordered using <em>TF-IDF scoring</em> for better relevance.</li>
         <li><strong>Preview Highlights</strong> - Search terms are shown <b><u>bold and underlined</u></b> in snippets.</li>
-        <li><strong>Upload & Edit</strong> - Add new documents or modify existing ones in real-time.</li>
+        <li><strong>Upload & Edit</strong> - Add new documents (like <code>.txt</code>, <code>.md</code>, <code>.csv</code>, <code>.log</code>, <code>.json</code>) or modify existing ones in real-time.</li>
+        <li><strong>Delete</strong> - remove any existing documents in real-time.</li>
       </ul>
     </div>
   `;
@@ -310,14 +307,25 @@ async function editDocument(id, newContent) {
   }
   return res.json();
 }
-
+// ---------- Upload Form ----------
 $("#upload-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const filename = $("#upload-filename").value.trim();
-  const content = $("#upload-content").value.trim();
+  const fileInput = $("#upload-file");
+  const filenameInput = $("#upload-filename");
+  const contentInput = $("#upload-content");
+
+  let filename = filenameInput.value.trim();
+  let content = contentInput.value.trim();
+
+  // ✅ If file chosen, read its content (override textarea if empty)
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    filename = filename || file.name;
+    content = content || await file.text();
+  }
 
   if (!filename || !content) {
-    alert("Please provide both filename and content.");
+    alert("Please provide either a file or paste content.");
     return;
   }
 
@@ -333,9 +341,9 @@ $("#upload-form").addEventListener("submit", async (e) => {
     submitBtn.disabled = true;
 
     const res = await uploadDocument(filename, content);
-    alert(
-      `✅ Uploaded successfully!\nFile: ${res.filename}\nDocument ID: ${res.id}`
-    );
+    alert(`✅ Uploaded successfully!\nFile: ${res.filename}\nDocument ID: ${res.id}`);
+
+    // Reset form
     $("#upload-form").reset();
 
     const currentQuery = input.value.trim();
@@ -352,11 +360,14 @@ $("#upload-form").addEventListener("submit", async (e) => {
     submitBtn.disabled = false;
   } catch (err) {
     alert("Upload failed: " + err.message);
-    e.target.querySelector('button[type="submit"]').disabled = false;
-    e.target.querySelector('button[type="submit"]').textContent = "Upload";
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Upload";
   }
 });
 
+
+// ---------- Edit Form ----------
 $("#edit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = $("#edit-id").value.trim();
@@ -407,16 +418,8 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("Mini Search Engine initialized");
   input.focus();
   // Hook up "Show All" button
-document.querySelector("#all-btn").addEventListener("click", listAllDocuments);
-/*
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.id = "all-btn";
-  allBtn.className = "info-btn";
-  allBtn.textContent = "📄 Show All";
-  allBtn.onclick = listAllDocuments;
-  document.querySelector("#search-form").appendChild(allBtn);
-*/
+  document.querySelector("#all-btn").addEventListener("click", listAllDocuments);
+
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "k") {
       e.preventDefault();
