@@ -2,17 +2,30 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-using namespace std;
+
 class BKTree {
 public:
-    void insert(const string& word);
-    vector<string> search(const string& target, int maxDistance);
+    BKTree() : root(nullptr) {}
+    ~BKTree();
+
+    void insert(const std::string& word);
+    std::vector<std::string> search(const std::string& target, int maxDist);
+
+    // lazy delete
+    void markDeleted(const std::string& word);
+
+    void clear();
+
 private:
     struct Node {
-        string word;
-        unordered_map<int, Node*> children;
-        Node(const string& w) : word(w) {}
+        std::string word;
+        bool deleted = false;  // ✅ per-node deletion flag
+        std::unordered_map<int, Node*> children;
+        Node(const std::string& w) : word(w) {}
     };
+
     Node* root = nullptr;
-    int levenshtein(const string& a, const string& b);
+
+    int levenshtein(const std::string& a, const std::string& b);
+    void freeNode(Node* node);
 };

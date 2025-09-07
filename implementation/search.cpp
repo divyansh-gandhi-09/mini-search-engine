@@ -1,88 +1,132 @@
 #include "search.h"
 #include "parser.h"
-#include "ranker.h"
-#include <sstream>
+#include <unordered_set>
 #include <algorithm>
 #include <iostream>
-#include <unordered_map>
-using namespace std;
-SearchEngine::SearchEngine(const unordered_map<string, unordered_map<int, int>>& index, int totalDocs)
+#include <cctype>
+
+// Constructor
+SearchEngine::SearchEngine(
+    const std::unordered_map<std::string, std::unordered_map<int,int>>& index,
+    int totalDocs)
     : invertedIndex(index), totalDocuments(totalDocs) {}
-vector<pair<int, double>> SearchEngine::search(const string& query, const Ranker& ranker) {
-    stringstream ss(query);
-    string word;
-    vector<string> terms;
+
+// ---------------- Search ----------------
+std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query, const Ranker& ranker) {
+    std::vector<std::string> terms = Parser::tokenize(query);
+    std::unordered_map<int,double> scores;
     
-    // Parse query
-    //making changes to actually use the parser.h
-    /*
-    while (ss >> word) {
-        transform(word.begin(), word.end(), word.begin(), ::tolower);
-        if (word == "and") isAnd = true;
-        else if (word == "or") isOr = true;
-        else terms.push_back(word);
-    }
-    */
-   
-   bool isAnd = false, isOr = false;
-   vector <string> tokens=Parser::tokenize(query);
-   for (const string& word : tokens) {
-       if (word=="and") isAnd=true;
-       else if (word=="or") isOr=true;
-       else terms.push_back(word);
-   }
-   //in case of queries like only having AND , OR returning empty result
-    if (terms.empty()) {
-         return {};
-    }
-    unordered_map<int, double> docScores;
-
-    if (isAnd) {
-        // AND logic
-        vector<unordered_set<int>> termDocSets;
-        for (const string& term : terms) {
-            unordered_set<int> docs;
-            auto ranked = Ranker::rank(term, invertedIndex, totalDocuments);
-            for (auto& [docID, _] : ranked)
-                docs.insert(docID);
-            termDocSets.push_back(docs);
+    // Check if query contains "AND" - case insensitive
+    bool isAndQuery = false;
+    std::vector<std::string> actualTerms;
+    
+    for (size_t i = 0; i < terms.size(); ++i) {
+        std::string term = terms[i];
+        // Convert to lowercase for comparison
+        std::transform(term.begin(), term.end(), term.begin(), ::tolower);
+        
+        if (term == "and") {
+            isAndQuery = true;
+        } else {
+            actualTerms.push_back(terms[i]); // Keep original case
         }
+    }
 
-        // Intersect all sets
-        unordered_set<int> commonDocs = termDocSets[0];
-        for (size_t i = 1; i < termDocSets.size(); ++i) {
-            unordered_set<int> temp;
-            for (int doc : commonDocs) {
-                if (termDocSets[i].count(doc)) temp.insert(doc);
-            }
-            commonDocs = move(temp);
-        }
+    if (isAndQuery && actualTerms.size() >= 2) {
+        // Use AND operation - only documents containing ALL terms
+        std::unordered_set<int> validDocs = andOperation(actualTerms);
+        
+        if (validDocs.empty()) return {}; // No documents contain all terms
+        
+        // Calculate scores only for documents that contain ALL terms
+        for (const auto& term : actualTerms) {
+            auto it = invertedIndex.find(term);
+            if (it == invertedIndex.end()) continue;
 
-        // Only score common docs
-        for (const string& term : terms) {
-            auto ranked = Ranker::rank(term, invertedIndex, totalDocuments);
-            for (auto& [docID, score] : ranked) {
-                if (commonDocs.count(docID)) {
-                    docScores[docID] += score;
+            const auto& docFreqMap = it->second;
+            int df = static_cast<int>(docFreqMap.size());
+
+            for (const auto& [docId, freq] : docFreqMap) {
+                // Only score documents that passed the AND filter
+                if (validDocs.count(docId)) {
+                    double s = ranker.score(term, freq, totalDocuments, df);
+                    scores[docId] += s;
                 }
             }
         }
     } else {
-        // OR or single term logic
-        for (const string& term : terms) {
-            auto ranked = Ranker::rank(term, invertedIndex, totalDocuments);
-            for (auto& [docID, score] : ranked) {
-                docScores[docID] += score;
+        // Regular OR operation - documents containing ANY term
+        for (const auto& term : actualTerms) {
+            auto it = invertedIndex.find(term);
+            if (it == invertedIndex.end()) continue;
+
+            const auto& docFreqMap = it->second;
+            int df = static_cast<int>(docFreqMap.size());
+
+            for (const auto& [docId, freq] : docFreqMap) {
+                double s = ranker.score(term, freq, totalDocuments, df);
+                scores[docId] += s;
             }
         }
     }
 
-    // Convert to sorted vector
-    vector<pair<int, double>> results(docScores.begin(), docScores.end());
-    sort(results.begin(), results.end(), [](auto& a, auto& b) {
-        return a.second > b.second;
-    });
-
+    std::vector<std::pair<int,double>> results(scores.begin(), scores.end());
+    std::sort(results.begin(), results.end(),
+              [](const auto& a, const auto& b){ return a.second > b.second; });
     return results;
 }
 
+// ---------------- AND operation ----------------
+std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string>& terms) {
+    if (terms.empty()) return {};
+    
+    auto it = invertedIndex.find(terms[0]);
+    if (it == invertedIndex.end()) return {};
+
+    std::unordered_set<int> resultSet;
+    for (const auto& [docId, freq] : it->second) {
+        resultSet.insert(docId);
+    }
+
+    for (size_t i = 1; i < terms.size(); ++i) {
+        auto it2 = invertedIndex.find(terms[i]);
+        if (it2 == invertedIndex.end()) return {}; // Empty result if any term not found
+        
+        std::unordered_set<int> currentSet;
+        for (const auto& [docId, freq] : it2->second) {
+            currentSet.insert(docId);
+        }
+
+        // Intersect: keep only documents that appear in both sets
+        std::unordered_set<int> newSet;
+        for (int docId : resultSet) {
+            if (currentSet.count(docId)) {
+                newSet.insert(docId);
+            }
+        }
+        resultSet = std::move(newSet);
+        
+        // If resultSet becomes empty, no need to continue
+        if (resultSet.empty()) {
+            break;
+        }
+    }
+
+    return resultSet;
+}
+
+// ---------------- OR operation ----------------
+std::unordered_set<int> SearchEngine::orOperation(const std::vector<std::string>& terms) {
+    std::unordered_set<int> resultSet;
+    
+    for (const std::string& term : terms) {
+        auto it = invertedIndex.find(term);
+        if (it == invertedIndex.end()) continue; // Skip terms not in index
+        
+        for (const auto& [docId, freq] : it->second) {
+            resultSet.insert(docId);
+        }
+    }
+    
+    return resultSet;
+}

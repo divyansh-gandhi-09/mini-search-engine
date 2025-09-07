@@ -2,7 +2,25 @@
 #include <algorithm>
 #include <queue>
 #include <cmath>
+#include <unordered_set>
+
 using namespace std;
+BKTree::~BKTree() {
+    clear();
+}
+
+void BKTree::freeNode(Node* node) {
+    if (!node) return;
+    for (auto& [d, child] : node->children) {
+        freeNode(child);
+    }
+    delete node;
+}
+
+void BKTree::clear() {
+    freeNode(root);
+    root = nullptr;
+}
 int BKTree::levenshtein(const string& a, const string& b) {
     int n = a.size(), m = b.size();
     vector<vector<int>> dp(n + 1, vector<int>(m + 1));
@@ -20,37 +38,64 @@ int BKTree::levenshtein(const string& a, const string& b) {
     }
     return dp[n][m];
 }
-void BKTree::insert(const string& word) {
+void BKTree::insert(const std::string& word) {
+    if (word.empty()) return; // 🚀 ignore empties
     if (!root) {
         root = new Node(word);
         return;
     }
     Node* curr = root;
-    while (true) {
-        int dist = levenshtein(word, curr->word);
-        if (dist == 0) return; // already exists
-        if (!curr->children[dist]) {
-            curr->children[dist] = new Node(word);
-            return;
-        }
+    int dist = levenshtein(word, curr->word);
+    while (curr->children.count(dist)) {
+        if (curr->word == word) return; // avoid duplicates
         curr = curr->children[dist];
+        dist = levenshtein(word, curr->word);
     }
+    curr->children[dist] = new Node(word);
 }
+
 vector<string> BKTree::search(const string& target, int maxDistance) {
     vector<string> result;
     if (!root) return result;
+
     queue<Node*> q;
+    unordered_set<string> seen; // ✅ prevent duplicates
     q.push(root);
 
     while (!q.empty()) {
         Node* node = q.front(); q.pop();
         int dist = levenshtein(target, node->word);
-        if (dist <= maxDistance) result.push_back(node->word);
 
+        // ✅ only add if not deleted & unique
+        if (!node->deleted && dist <= maxDistance && !seen.count(node->word)) {
+            result.push_back(node->word);
+            seen.insert(node->word);
+        }
+
+        // explore relevant children
         for (auto& [childDist, childNode] : node->children) {
-            if (childDist >= dist - maxDistance && childDist <= dist + maxDistance)
+            if (childDist >= dist - maxDistance && childDist <= dist + maxDistance) {
                 q.push(childNode);
+            }
         }
     }
     return result;
+}
+void BKTree::markDeleted(const std::string& word) {
+    if (word.empty()) return; // 🚀 safety check
+    if (!root) return;
+
+    std::queue<Node*> q;
+    q.push(root);
+
+    while (!q.empty()) {
+        Node* node = q.front(); q.pop();
+        if (node->word == word) {
+            node->deleted = true; // ✅ mark as deleted
+            return;
+        }
+        for (auto& [_, child] : node->children) {
+            q.push(child);
+        }
+    }
 }

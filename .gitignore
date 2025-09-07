@@ -2,3 +2,4 @@ main_console.exe
 server.exe
 /.vscode/**
 data/*.txt
+index.json

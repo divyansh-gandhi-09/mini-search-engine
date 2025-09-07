@@ -1,12 +1,12 @@
 #include <iostream>
 #include <filesystem>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <string>
-#include <algorithm>
 #include <fstream>
 #include <sstream>
-#include <memory> // for std::unique_ptr
+#include <memory>
 
 #include "../third_party/httplib.h"
 #include "../third_party/json.hpp"
@@ -21,38 +21,54 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-// Helper function to highlight search terms in text
-std::string highlightText(const std::string& text, const std::string& query) {
-    if (query.empty()) return text;
-    
-    std::vector<std::string> reserved = {"and", "or"};
-    std::istringstream iss(query);
-    std::string term;
-    std::vector<std::string> terms;
-    
-    while (iss >> term) {
-        std::transform(term.begin(), term.end(), term.begin(), ::tolower);
-        if (std::find(reserved.begin(), reserved.end(), term) == reserved.end()) {
-            terms.push_back(term);
-        }
+// ---------------- Persistence ----------------
+void saveIndexToFile(const Indexer& indexer,
+                     const std::unordered_map<int, std::string>& docIdToPath,
+                     const std::unordered_map<int, std::string>& docIdToRel,
+                     const std::unordered_map<int, std::vector<std::string>>& docTokens,
+                     int docID) {
+    json j;
+    j["docID"] = docID;
+    j["docIdToPath"] = docIdToPath;
+    j["docIdToRel"]  = docIdToRel;
+    j["index"]       = indexer.getIndex();
+    j["docTokens"]   = docTokens;
+
+    // compact dump (faster, smaller)
+    std::ofstream out("index.json.tmp", std::ios::trunc);
+    out << j.dump();
+    out.close();
+    fs::rename("index.json.tmp", "index.json");
+}
+
+bool loadIndexFromFile(Indexer& indexer,
+                       std::unordered_map<int, std::string>& docIdToPath,
+                       std::unordered_map<int, std::string>& docIdToRel,
+                       std::unordered_map<int, std::vector<std::string>>& docTokens,
+                       int& docID) {
+    if (!fs::exists("index.json")) return false;
+    std::ifstream in("index.json");
+    if (!in.is_open()) return false;
+    json j; in >> j;
+
+    try {
+        docID       = j["docID"].get<int>();
+        docIdToPath = j["docIdToPath"].get<std::unordered_map<int,std::string>>();
+        docIdToRel  = j["docIdToRel"].get<std::unordered_map<int,std::string>>();
+        docTokens   = j["docTokens"].get<std::unordered_map<int,std::vector<std::string>>>();
+        indexer.setIndex(j["index"].get<std::unordered_map<std::string,std::unordered_map<int,int>>>());
+    } catch (...) {
+        return false;
     }
-    
-    std::string result = text;
-    for (const auto& t : terms) {
-        size_t pos = 0;
-        while ((pos = result.find(t, pos)) != std::string::npos) {
-            result.replace(pos, t.length(), "<b><u>" + t + "</u></b>");
-            pos += t.length() + 7; // length of tags
-        }
-    }
-    
-    return result;
+    return true;
 }
 
 int main() {
     std::cout << "\n------ Mini Search Engine (Web) ------\n";
-    std::cout << "Indexing documents from './data/'...\n";
 
+    // in-memory structures
+    std::unordered_map<int, std::vector<std::string>> docTokens;
+    std::unordered_map<int, std::string> docIdToContent; // 🚀 cache for file contents
     Indexer indexer;
     Trie autoComplete;
     BKTree typoCorrector;
@@ -60,52 +76,103 @@ int main() {
     std::unordered_map<int, std::string> docIdToRel;
     int docID = 0;
 
-    // ---------------- Helper: index or reindex ----------------
-    auto indexSingleDocument = [&](int id, const std::string& path, const std::string& content) {
-        indexer.indexDocument(id, content);
+    std::unique_ptr<SearchEngine> engine;
 
-        auto tokens = Parser::tokenize(content);
-        for (const auto& w : tokens) {
-            autoComplete.insert(w);
-            typoCorrector.insert(w);
+    // ---------------- Load or Index ----------------
+    bool freshBuild = false;
+    if (!loadIndexFromFile(indexer, docIdToPath, docIdToRel, docTokens, docID)) {
+        std::cout << "No index.json found, indexing ./data …\n";
+        freshBuild = true;
+    } else {
+        std::unordered_set<std::string> actualFiles;
+        if (fs::exists("./data")) {
+            for (auto& entry : fs::directory_iterator("./data")) {
+                if (entry.is_regular_file()) actualFiles.insert(entry.path().string());
+            }
         }
-        docIdToPath[id] = path;
-        docIdToRel[id]  = fs::path(path).filename().string();
-    };
+        std::unordered_set<std::string> indexedFiles;
+        for (auto& [id, path] : docIdToPath) indexedFiles.insert(path);
 
-    // ---------------- Initial Indexing ----------------
-    if (!fs::exists("./data")) {
-        fs::create_directory("./data");
-        std::cout << "Created ./data directory\n";
+        if (actualFiles != indexedFiles) {
+            std::cout << "Data folder changed (files added/removed). Will rebuild from ./data.\n";
+            freshBuild = true;
+        }
     }
 
+    
+if (freshBuild) {
+    indexer.clear();
+    autoComplete.clear();
+    typoCorrector.clear();
+    docTokens.clear();
+    docIdToPath.clear();
+    docIdToRel.clear();
+    docIdToContent.clear();
+    docID = 0;
+
+    if (!fs::exists("./data")) fs::create_directory("./data");
+
+    std::cout << "Indexing files from ./data folder...\n";
+    
     for (const auto& entry : fs::directory_iterator("./data")) {
         if (!entry.is_regular_file()) continue;
         std::string path = entry.path().string();
         std::string content = Parser::readFile(path);
+        if (content.empty()) continue;
 
-        if (!content.empty()) {
-            indexSingleDocument(docID, path, content);
-            ++docID;
+        auto tokens = Parser::tokenize(content);
+        docTokens[docID] = tokens;
+        docIdToContent[docID] = content;
+        indexer.indexDocumentFromTokens(docID, tokens);
+        for (const auto& w : tokens) {
+            if (!w.empty()) { autoComplete.insert(w); typoCorrector.insert(w); }
         }
+        docIdToPath[docID] = path;
+        docIdToRel[docID] = fs::path(path).filename().string();
+        ++docID;
     }
+    
+    std::cout << "Indexed " << docID << " files from ./data folder.\n";
+    saveIndexToFile(indexer, docIdToPath, docIdToRel, docTokens, docID);
+    
+} else {
+    std::cout << "Loaded " << docIdToPath.size() << " files from index.json.\n";
+    
+    // Your existing else block code remains the same...
+    std::cout << "Rebuilding autocomplete + corrections from saved tokens...\n";
+    autoComplete.clear();
+    typoCorrector.clear();
+    docIdToContent.clear();
 
-    auto index = indexer.getIndex();
-    std::unique_ptr<SearchEngine> engine = std::make_unique<SearchEngine>(index, docID);
+    for (auto& [id, path] : docIdToPath) {
+        docIdToContent[id] = Parser::readFile(path);
+    }
+    std::unordered_set<std::string> vocab;
+    for (auto& [id, tokens] : docTokens) {
+        for (const auto& t : tokens) if (!t.empty()) vocab.insert(t);
+    }
+    for (const auto& w : vocab) {
+        autoComplete.insert(w);
+        typoCorrector.insert(w);
+    }
+}
 
-    std::cout << "Indexing complete. " << docID << " documents indexed.\n";
+    engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+
+    auto persistAfterChange = [&]() {
+        saveIndexToFile(indexer, docIdToPath, docIdToRel, docTokens, docID);
+    };
 
     httplib::Server svr;
 
-    // Enable CORS
-    svr.set_pre_routing_handler([](const httplib::Request& req, httplib::Response& res) {
+    svr.set_pre_routing_handler([](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
         return httplib::Server::HandlerResponse::Unhandled;
     });
 
-    svr.Options(".*", [](const httplib::Request&, httplib::Response& res) { return; });
+    svr.Options(".*", [](const httplib::Request&, httplib::Response&) { return; });
     svr.set_mount_point("/", "./public");
 
     // ---------------- Health ----------------
@@ -113,158 +180,95 @@ int main() {
         res.set_content(R"({"status":"ok"})", "application/json");
     });
 
-    // ---------------- Suggest ----------------
+    // ---------------- Suggestions ----------------
     svr.Get("/suggest", [&](const httplib::Request& req, httplib::Response& res) {
         auto prefix = req.get_param_value("prefix");
-        if (prefix.empty()) {
-            res.set_content("[]", "application/json");
-            return;
-        }
-        auto suggestions = autoComplete.suggest(prefix);
-        json j = suggestions;
-        res.set_content(j.dump(), "application/json");
+        auto suggestions = prefix.empty() ? std::vector<std::string>() : autoComplete.suggest(prefix);
+        res.set_content(json(suggestions).dump(), "application/json");
     });
 
     // ---------------- Correct ----------------
     svr.Get("/correct", [&](const httplib::Request& req, httplib::Response& res) {
         auto word = req.get_param_value("word");
-        auto maxStr = req.get_param_value("max");
-        int maxResults = maxStr.empty() ? 3 : std::stoi(maxStr);
-
-        if (word.empty()) {
-            res.set_content("[]", "application/json");
-            return;
-        }
-
-        auto corrections = typoCorrector.search(word, 2);
-        if (corrections.size() > maxResults) {
-            corrections.resize(maxResults);
-        }
-
-        json j = corrections;
-        res.set_content(j.dump(), "application/json");
+        int maxResults = req.has_param("max") ? std::stoi(req.get_param_value("max")) : 3;
+        auto corrections = word.empty() ? std::vector<std::string>() : typoCorrector.search(word, 2);
+        if ((int)corrections.size() > maxResults) corrections.resize(maxResults);
+        res.set_content(json(corrections).dump(), "application/json");
     });
 
     // ---------------- Search ----------------
     svr.Get("/search", [&](const httplib::Request& req, httplib::Response& res) {
         auto query = req.get_param_value("query");
-        if (query.empty()) {
-            res.set_content("[]", "application/json");
-            return;
-        }
-
+        if (query.empty()) { res.set_content("[]","application/json"); return; }
         try {
             Ranker ranker;
             auto results = engine->search(query, ranker);
             json j = json::array();
-
             for (const auto& result : results) {
-                std::string content = Parser::readFile(docIdToPath[result.first]);
-                std::string preview = content.length() > 200 ? 
-                    content.substr(0, 200) + "..." : content;
-
-                json resultObj = {
+                std::string content = docIdToContent[result.first];
+                auto pos = content.find(query);
+                std::string preview;
+                if (pos != std::string::npos) {
+                    size_t start = (pos > 50) ? pos - 50 : 0;
+                    preview = content.substr(start, 200);
+                } else {
+                    preview = content.substr(0, std::min<size_t>(200, content.size()));
+                }
+                j.push_back({
                     {"id", result.first},
                     {"score", result.second},
                     {"path", docIdToPath[result.first]},
                     {"url", docIdToRel[result.first]},
                     {"preview", preview}
-                };
-                j.push_back(resultObj);
+                });
             }
-
             res.set_content(j.dump(), "application/json");
         } catch (const std::exception& e) {
             res.status = 500;
-            json error = {{"error", e.what()}};
-            res.set_content(error.dump(), "application/json");
+            res.set_content(json({{"error", e.what()}}).dump(), "application/json");
         }
     });
 
     // ---------------- Document ----------------
     svr.Get("/document", [&](const httplib::Request& req, httplib::Response& res) {
-        auto idStr = req.get_param_value("id");
-        if (idStr.empty()) {
-            res.status = 400;
-            res.set_content(R"({"error":"missing id parameter"})", "application/json");
-            return;
-        }
-
-        try {
-            int id = std::stoi(idStr);
-            if (docIdToPath.find(id) == docIdToPath.end()) {
-                res.status = 404;
-                res.set_content(R"({"error":"document not found"})", "application/json");
-                return;
-            }
-
-            std::string content = Parser::readFile(docIdToPath[id]);
-            json response = {
-                {"id", id},
-                {"path", docIdToPath[id]},
-                {"url", docIdToRel[id]},
-                {"content", content}
-            };
-
-            res.set_content(response.dump(), "application/json");
-        } catch (const std::exception& e) {
-            res.status = 500;
-            json error = {{"error", e.what()}};
-            res.set_content(error.dump(), "application/json");
-        }
+        if (!req.has_param("id")) { res.status = 400; return; }
+        int id = std::stoi(req.get_param_value("id"));
+        if (!docIdToPath.count(id)) { res.status = 404; return; }
+        res.set_content(json({
+            {"id", id},
+            {"path", docIdToPath[id]},
+            {"url", docIdToRel[id]},
+            {"content", docIdToContent[id]}
+        }).dump(), "application/json");
     });
 
     // ---------------- Upload ----------------
     svr.Post("/upload", [&](const httplib::Request& req, httplib::Response& res) {
         try {
             auto body = json::parse(req.body);
-            if (!body.contains("filename") || !body.contains("content")) {
-                res.status = 400;
-                res.set_content(R"({"error":"missing filename or content"})", "application/json");
-                return;
-            }
-
-            std::string filename = body["filename"];
-            std::string content = body["content"];
-
-            if (filename.empty() || content.empty()) {
-                res.status = 400;
-                res.set_content(R"({"error":"filename and content cannot be empty"})", "application/json");
-                return;
-            }
-
-            if (!fs::exists("./data")) {
-                fs::create_directory("./data");
-            }
-
+            std::string filename = body["filename"], content = body["content"];
             std::string path = "./data/" + filename;
-            std::ofstream ofs(path);
-            if (!ofs.is_open()) {
-                res.status = 500;
-                res.set_content(R"({"error":"failed to create file"})", "application/json");
-                return;
-            }
-
-            ofs << content;
-            ofs.close();
+            std::ofstream(path) << content;
 
             int newId = docID++;
-            indexSingleDocument(newId, path, content);
+            docIdToPath[newId] = path;
+            docIdToRel[newId]  = filename;
+            docIdToContent[newId] = content; // 🚀 cache
 
-            // 🔄 rebuild search engine
-            auto newIndex = indexer.getIndex();
-            engine = std::make_unique<SearchEngine>(newIndex, docID);
+            auto tokens = Parser::tokenize(content);
+            docTokens[newId] = tokens;
+            indexer.indexDocumentFromTokens(newId, tokens);
+            for (const auto& w : tokens) {
+                if (!w.empty()) { autoComplete.insert(w); typoCorrector.insert(w); }
+            }
 
-            json response = {
-                {"status", "uploaded"},
-                {"id", newId},
-                {"filename", filename}
-            };
-            res.set_content(response.dump(), "application/json");
+            engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+            persistAfterChange();
+
+            res.set_content(json({{"status","uploaded"},{"id",newId},{"filename",filename}}).dump(), "application/json");
         } catch (const std::exception& e) {
             res.status = 500;
-            json error = {{"error", std::string("upload failed: ") + e.what()}};
-            res.set_content(error.dump(), "application/json");
+            res.set_content(json({{"error", std::string("upload failed: ") + e.what()}}).dump(), "application/json");
         }
     });
 
@@ -272,112 +276,91 @@ int main() {
     svr.Put(R"(/edit/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
         try {
             int id = std::stoi(req.matches[1]);
-            if (docIdToPath.find(id) == docIdToPath.end()) {
-                res.status = 404;
-                res.set_content(R"({"error":"document not found"})", "application/json");
-                return;
+            if (!docIdToPath.count(id)) { 
+                res.status = 404; 
+                res.set_content(R"({"error":"document not found"})","application/json"); 
+                return; 
             }
-
             auto body = json::parse(req.body);
-            if (!body.contains("content")) {
-                res.status = 400;
-                res.set_content(R"({"error":"missing content"})", "application/json");
-                return;
-            }
-
             std::string newContent = body["content"];
-            if (newContent.empty()) {
-                res.status = 400;
-                res.set_content(R"({"error":"content cannot be empty"})", "application/json");
-                return;
+            std::ofstream(docIdToPath[id]) << newContent;
+
+            if (docTokens.count(id)) {
+                indexer.removeDocument(id, docTokens[id]);
+                for (const auto& w : docTokens[id]) {
+                    if (!w.empty()) { autoComplete.remove(w); typoCorrector.markDeleted(w); }
+                }
+            }
+            auto tokens = Parser::tokenize(newContent);
+            docTokens[id] = tokens;
+            docIdToContent[id] = newContent; // 🚀 update cache
+            indexer.indexDocumentFromTokens(id, tokens);
+            for (const auto& w : tokens) {
+                if (!w.empty()) { autoComplete.insert(w); typoCorrector.insert(w); }
             }
 
-            std::ofstream ofs(docIdToPath[id]);
-            if (!ofs.is_open()) {
-                res.status = 500;
-                res.set_content(R"({"error":"failed to write file"})", "application/json");
-                return;
-            }
-            ofs << newContent;
-            ofs.close();
+            engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+            persistAfterChange();
 
-            indexSingleDocument(id, docIdToPath[id], newContent);
-
-            // 🔄 rebuild search engine
-            auto newIndex = indexer.getIndex();
-            engine = std::make_unique<SearchEngine>(newIndex, docID);
-
-            json response = {
-                {"status", "updated"},
-                {"id", id}
-            };
-            res.set_content(response.dump(), "application/json");
+            res.set_content(json({{"status","updated"},{"id",id}}).dump(), "application/json");
         } catch (const std::exception& e) {
             res.status = 500;
-            json error = {{"error", std::string("edit failed: ") + e.what()}};
-            res.set_content(error.dump(), "application/json");
+            res.set_content(json({{"error", std::string("edit failed: ") + e.what()}}).dump(), "application/json");
         }
     });
-    // --- List all documents ---
-svr.Get("/documents", [&](const httplib::Request &req, httplib::Response &res) {
-    json j;
-    for (auto &[id, relPath] : docIdToRel) {
-        std::ifstream file(docIdToPath[id]);
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        j.push_back({
-            {"id", id},
-            {"url", relPath},
-            {"content", buffer.str().substr(0, 200)} // preview first 200 chars
-        });
-    }
-    res.set_content(j.dump(), "application/json");
-});
 
-// --- Delete document ---
-svr.Delete(R"(/delete/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
-    try {
-        int id = std::stoi(req.matches[1]);
-        if (docIdToPath.find(id) == docIdToPath.end()) {
-            res.status = 404;
-            res.set_content(R"({"error":"document not found"})", "application/json");
-            return;
+    // ---------------- Delete ----------------
+    svr.Delete(R"(/delete/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
+        try {
+            int id = std::stoi(req.matches[1]);
+            if (!docIdToPath.count(id)) { 
+                res.status = 404; 
+                res.set_content(R"({"error":"document not found"})","application/json"); 
+                return; 
+            }
+            if (fs::exists(docIdToPath[id])) fs::remove(docIdToPath[id]);
+            docIdToPath.erase(id);
+            docIdToRel.erase(id);
+            docIdToContent.erase(id); // 🚀 clear cache
+
+            if (docTokens.count(id)) {
+                indexer.removeDocument(id, docTokens[id]);
+                for (const auto& w : docTokens[id]) {
+                    if (!w.empty()) { autoComplete.remove(w); typoCorrector.markDeleted(w); }
+                }
+                docTokens.erase(id);
+            }
+            engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+            persistAfterChange();
+
+            res.set_content(json({{"status","deleted"},{"id",id}}).dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.status = 500;
+            res.set_content(json({{"error", std::string("delete failed: ") + e.what()}}).dump(), "application/json");
         }
+    });
 
-        std::string path = docIdToPath[id];
-        if (fs::exists(path)) fs::remove(path);
+    // ---------------- List ----------------
+    svr.Get("/documents", [&](const httplib::Request&, httplib::Response& res) {
+        json j = json::array();
+        std::vector<int> ids;
+        for (auto& [id, _] : docIdToRel) ids.push_back(id);
+        std::sort(ids.begin(), ids.end());
 
-        docIdToPath.erase(id);
-        docIdToRel.erase(id);
-
-        // 🔄 Rebuild index
-        indexer = Indexer();
-        for (auto &[docId, path2] : docIdToPath) {
-            std::ifstream f(path2);
-            std::stringstream buf;
-            buf << f.rdbuf();
-            indexer.indexDocument(docId, buf.str());
-
+        for (int id : ids) {
+            j.push_back({
+                {"id", id},
+                {"url", docIdToRel[id]},
+                {"content", docIdToContent[id].substr(0,200)} // 🚀 from cache
+            });
         }
-        engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
-
-        json response = {{"status","deleted"},{"id",id}};
-        res.set_content(response.dump(), "application/json");
-    } catch (const std::exception& e) {
-        res.status = 500;
-        json error = {{"error", std::string("delete failed: ") + e.what()}};
-        res.set_content(error.dump(), "application/json");
-    }
-});
-
+        res.set_content(j.dump(),"application/json");
+    });
 
     std::cout << "Server running at http://localhost:8080\n";
-    std::cout << "Access the web interface at: http://localhost:8080/index.html\n";
-    
     if (!svr.listen("0.0.0.0", 8080)) {
         std::cerr << "Failed to start server on port 8080\n";
         return 1;
     }
-
     return 0;
 }

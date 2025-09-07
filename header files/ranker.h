@@ -1,14 +1,13 @@
 #pragma once
-#include <unordered_map>
 #include <string>
 #include <vector>
 #include <cmath>
-#include <sstream>
-#include <algorithm>
-using namespace std;
+
 class Ranker {
 public:
-    static vector<pair<int, double>> rank(const string& query, 
-    const unordered_map<string, unordered_map<int, int>>& index,
-    int totalDocs);
+    // Score a single term occurrence
+    // freq = term frequency in a doc
+    // totalDocs = total number of documents
+    // df = number of docs containing this term
+    static double score(const std::string& term, int freq, int totalDocs, int df);
 };

@@ -1,31 +1,14 @@
 #include "ranker.h"
-using namespace std;
-vector<pair<int, double>> Ranker::rank(
-    const string& query,
-    const unordered_map<string, unordered_map<int, int>>& index,
-    int totalDocs
-) {
-    unordered_map<int, double> docScores;
-    unordered_map<int, int> docLengths;
-    istringstream iss(query);
-    string term;
-    while (iss >> term) {
-        if (index.count(term)) {
-            //all the doc that contain the term
-            const auto& postingList = index.at(term);
-            int df = postingList.size();
-            double idf = log((double)(totalDocs + 1) / (df + 1)) + 1;
-            for (const auto& [docID, tf] : postingList) {
-                double tf_weight = 1 + log(tf);
-                double score = tf_weight * idf;
-                docScores[docID] += score;
-            }
-        }
-    }
-    vector<pair<int, double>> ranked(docScores.begin(), docScores.end());
-    sort(ranked.begin(), ranked.end(),
-              [](const auto& a, const auto& b) {
-                  return a.second > b.second;
-              });
-    return ranked;
+#include <cmath>
+
+double Ranker::score(const std::string& /*term*/, int freq, int totalDocs, int df) {
+    if (freq <= 0 || df == 0) return 0.0;
+
+    // Term Frequency (TF)
+    double tf = 1.0 + std::log(freq);
+
+    // Inverse Document Frequency (IDF)
+    double idf = std::log((double)(totalDocs + 1) / (df + 1)) + 1.0;
+
+    return tf * idf;
 }
