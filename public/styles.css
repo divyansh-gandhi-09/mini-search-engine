@@ -82,7 +82,7 @@ button:hover { filter: brightness(0.95); }
   border-left: 3px solid #1f6feb;
 }
 
-/* ✅ FIXED: Consistent action button styling */
+/*  FIXED: Consistent action button styling */
 .action-btn {
   padding: 8px 16px !important;
   font-size: 14px !important;
@@ -180,11 +180,11 @@ button:hover { filter: brightness(0.95); }
 .preview b u,
 .doc-text b u {
   font-weight: 700;
-  color: #1f6feb;              /* GitHub blue shade */
+  color: #1f6feb;              
   text-decoration: underline;
   text-decoration-color: #1f6feb;
-  text-decoration-thickness: 2px; /* thinner underline */
-  text-underline-offset: 2px;     /* spacing from text */
+  text-decoration-thickness: 2px; 
+  text-underline-offset: 2px;     
 }
 
 /* Upload & Edit forms */
@@ -225,7 +225,7 @@ button:hover { filter: brightness(0.95); }
   background: #1559c9;
 }
 
-/* ✅ FIXED: Result action buttons container */
+/* FIXED: Result action buttons container */
 .result-actions {
   margin-top: 12px;
   display: flex;

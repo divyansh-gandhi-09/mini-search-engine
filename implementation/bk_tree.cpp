@@ -39,7 +39,7 @@ int BKTree::levenshtein(const string& a, const string& b) {
     return dp[n][m];
 }
 void BKTree::insert(const std::string& word) {
-    if (word.empty()) return; // 🚀 ignore empties
+    if (word.empty()) return; // to ignore empties so just return 
     if (!root) {
         root = new Node(word);
         return;
@@ -47,7 +47,7 @@ void BKTree::insert(const std::string& word) {
     Node* curr = root;
     int dist = levenshtein(word, curr->word);
     while (curr->children.count(dist)) {
-        if (curr->word == word) return; // avoid duplicates
+        if (curr->word == word) return; //  duplicates ke liye 
         curr = curr->children[dist];
         dist = levenshtein(word, curr->word);
     }
@@ -59,14 +59,14 @@ vector<string> BKTree::search(const string& target, int maxDistance) {
     if (!root) return result;
 
     queue<Node*> q;
-    unordered_set<string> seen; // ✅ prevent duplicates
+    unordered_set<string> seen; //  duplicates
     q.push(root);
 
     while (!q.empty()) {
         Node* node = q.front(); q.pop();
         int dist = levenshtein(target, node->word);
 
-        // ✅ only add if not deleted & unique
+        //  only add if not deleted & unique
         if (!node->deleted && dist <= maxDistance && !seen.count(node->word)) {
             result.push_back(node->word);
             seen.insert(node->word);
@@ -82,7 +82,7 @@ vector<string> BKTree::search(const string& target, int maxDistance) {
     return result;
 }
 void BKTree::markDeleted(const std::string& word) {
-    if (word.empty()) return; // 🚀 safety check
+    if (word.empty()) return; // safety check
     if (!root) return;
 
     std::queue<Node*> q;
@@ -91,7 +91,7 @@ void BKTree::markDeleted(const std::string& word) {
     while (!q.empty()) {
         Node* node = q.front(); q.pop();
         if (node->word == word) {
-            node->deleted = true; // ✅ mark as deleted
+            node->deleted = true; //  mark as deleted
             return;
         }
         for (auto& [_, child] : node->children) {

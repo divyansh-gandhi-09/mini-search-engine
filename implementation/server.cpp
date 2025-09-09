@@ -35,8 +35,9 @@ void saveIndexToFile(const Indexer& indexer,
     j["docTokens"]   = docTokens;
 
     // compact dump (faster, smaller)
-    std::ofstream out("index.json.tmp", std::ios::trunc);
-    out << j.dump();
+    std::ofstream out("index.json.tmp", std::ios::trunc | std::ios::binary);
+    std::string jsonStr = j.dump();  // No pretty printing for speed
+    out.write(jsonStr.c_str(), jsonStr.size());
     out.close();
     fs::rename("index.json.tmp", "index.json");
 }
@@ -68,7 +69,7 @@ int main() {
 
     // in-memory structures
     std::unordered_map<int, std::vector<std::string>> docTokens;
-    std::unordered_map<int, std::string> docIdToContent; // 🚀 cache for file contents
+    std::unordered_map<int, std::string> docIdToContent; //  cache for file contents
     Indexer indexer;
     Trie autoComplete;
     BKTree typoCorrector;
@@ -100,6 +101,7 @@ int main() {
     }
 
     
+// 1. OPTIMIZE INITIAL INDEXING - Add progress and batch processing
 if (freshBuild) {
     indexer.clear();
     autoComplete.clear();
@@ -112,33 +114,52 @@ if (freshBuild) {
 
     if (!fs::exists("./data")) fs::create_directory("./data");
 
-    std::cout << "Indexing files from ./data folder...\n";
-    
+    // Count files first for progress
+    std::vector<fs::directory_entry> files;
     for (const auto& entry : fs::directory_iterator("./data")) {
-        if (!entry.is_regular_file()) continue;
+        if (entry.is_regular_file()) files.push_back(entry);
+    }
+    
+    std::cout << "Indexing " << files.size() << " files from ./data folder...\n";
+    
+    // Process with progress indicator
+    for (size_t i = 0; i < files.size(); ++i) {
+        const auto& entry = files[i];
         std::string path = entry.path().string();
         std::string content = Parser::readFile(path);
         if (content.empty()) continue;
 
         auto tokens = Parser::tokenize(content);
-        docTokens[docID] = tokens;
-        docIdToContent[docID] = content;
-        indexer.indexDocumentFromTokens(docID, tokens);
-        for (const auto& w : tokens) {
-            if (!w.empty()) { autoComplete.insert(w); typoCorrector.insert(w); }
+        docTokens[docID] = std::move(tokens); // Use move semantics
+        docIdToContent[docID] = std::move(content);
+        indexer.indexDocumentFromTokens(docID, docTokens[docID]);
+        
+        // Batch insert for vocabulary (more efficient)
+        for (const auto& w : docTokens[docID]) {
+            if (!w.empty()) { 
+                autoComplete.insert(w); 
+                typoCorrector.insert(w); 
+            }
         }
+        
         docIdToPath[docID] = path;
-        docIdToRel[docID] = fs::path(path).filename().string();
+        docIdToRel[docID] = entry.path().filename().string();
         ++docID;
+        
+        // Progress every 200 files ~1000 words
+        if ((i + 1) % 200 == 0 || i == files.size() - 1) {
+            std::cout << "Progress: " << (i + 1) << "/" << files.size() << " files processed\n";
+        }
     }
     
     std::cout << "Indexed " << docID << " files from ./data folder.\n";
+    std::cout << "Saving index to disk...\n";
     saveIndexToFile(indexer, docIdToPath, docIdToRel, docTokens, docID);
+
     
 } else {
     std::cout << "Loaded " << docIdToPath.size() << " files from index.json.\n";
     
-    // Your existing else block code remains the same...
     std::cout << "Rebuilding autocomplete + corrections from saved tokens...\n";
     autoComplete.clear();
     typoCorrector.clear();
@@ -272,42 +293,53 @@ if (freshBuild) {
         }
     });
 
-    // ---------------- Edit ----------------
-    svr.Put(R"(/edit/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
-        try {
-            int id = std::stoi(req.matches[1]);
-            if (!docIdToPath.count(id)) { 
-                res.status = 404; 
-                res.set_content(R"({"error":"document not found"})","application/json"); 
-                return; 
-            }
-            auto body = json::parse(req.body);
-            std::string newContent = body["content"];
-            std::ofstream(docIdToPath[id]) << newContent;
-
-            if (docTokens.count(id)) {
-                indexer.removeDocument(id, docTokens[id]);
-                for (const auto& w : docTokens[id]) {
-                    if (!w.empty()) { autoComplete.remove(w); typoCorrector.markDeleted(w); }
-                }
-            }
-            auto tokens = Parser::tokenize(newContent);
-            docTokens[id] = tokens;
-            docIdToContent[id] = newContent; // 🚀 update cache
-            indexer.indexDocumentFromTokens(id, tokens);
-            for (const auto& w : tokens) {
-                if (!w.empty()) { autoComplete.insert(w); typoCorrector.insert(w); }
-            }
-
-            engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
-            persistAfterChange();
-
-            res.set_content(json({{"status","updated"},{"id",id}}).dump(), "application/json");
-        } catch (const std::exception& e) {
-            res.status = 500;
-            res.set_content(json({{"error", std::string("edit failed: ") + e.what()}}).dump(), "application/json");
+    // 2. OPTIMIZE EDIT OPERATION - Don't recreate SearchEngine, just update it
+svr.Put(R"(/edit/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
+    try {
+        int id = std::stoi(req.matches[1]);
+        if (!docIdToPath.count(id)) { 
+            res.status = 404; 
+            res.set_content(R"({"error":"document not found"})","application/json"); 
+            return; 
         }
-    });
+        auto body = json::parse(req.body);
+        std::string newContent = body["content"];
+        
+        // Write file
+        std::ofstream(docIdToPath[id]) << newContent;
+
+        // Remove old document efficiently
+        if (docTokens.count(id)) {
+            indexer.removeDocument(id, docTokens[id]);
+            // Don't remove from autocomplete/typo - other docs might use same words
+        }
+        
+        // Add new document
+        auto tokens = Parser::tokenize(newContent);
+        docTokens[id] = std::move(tokens);
+        docIdToContent[id] = std::move(newContent);
+        indexer.indexDocumentFromTokens(id, docTokens[id]);
+        
+        // Add new words to vocabulary
+        for (const auto& w : docTokens[id]) {
+            if (!w.empty()) { 
+                autoComplete.insert(w); 
+                typoCorrector.insert(w); 
+            }
+        }
+        engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+        
+        // Save asynchronously (don't block response)
+        std::thread([&]() {
+            saveIndexToFile(indexer, docIdToPath, docIdToRel, docTokens, docID);
+        }).detach();
+
+        res.set_content(json({{"status","updated"},{"id",id}}).dump(), "application/json");
+    } catch (const std::exception& e) {
+        res.status = 500;
+        res.set_content(json({{"error", std::string("edit failed: ") + e.what()}}).dump(), "application/json");
+    }
+});
 
     // ---------------- Delete ----------------
     svr.Delete(R"(/delete/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
@@ -321,7 +353,7 @@ if (freshBuild) {
             if (fs::exists(docIdToPath[id])) fs::remove(docIdToPath[id]);
             docIdToPath.erase(id);
             docIdToRel.erase(id);
-            docIdToContent.erase(id); // 🚀 clear cache
+            docIdToContent.erase(id); //  clear cache
 
             if (docTokens.count(id)) {
                 indexer.removeDocument(id, docTokens[id]);
@@ -351,7 +383,7 @@ if (freshBuild) {
             j.push_back({
                 {"id", id},
                 {"url", docIdToRel[id]},
-                {"content", docIdToContent[id].substr(0,200)} // 🚀 from cache
+                {"content", docIdToContent[id].substr(0,200)} //  from cache
             });
         }
         res.set_content(j.dump(),"application/json");

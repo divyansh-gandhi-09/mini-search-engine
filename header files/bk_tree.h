@@ -19,7 +19,7 @@ public:
 private:
     struct Node {
         std::string word;
-        bool deleted = false;  // ✅ per-node deletion flag
+        bool deleted = false;
         std::unordered_map<int, Node*> children;
         Node(const std::string& w) : word(w) {}
     };

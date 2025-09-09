@@ -12,7 +12,7 @@ string Parser::readFile(const string& filepath) {
 }
 vector<string> Parser::tokenize(const string& text) {
     vector<string> tokens;
-    tokens.reserve(text.size()/5); // heuristic to avoid frequent reallocations
+    tokens.reserve(text.size()/5); //  avoid frequent reallocations
     string word;
     for (char ch : text) {
         if (isalnum(ch)) word += (ch | 0x20); // faster lowercase for ASCII

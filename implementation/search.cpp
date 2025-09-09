@@ -5,7 +5,7 @@
 #include <iostream>
 #include <cctype>
 
-// Constructor
+
 SearchEngine::SearchEngine(
     const std::unordered_map<std::string, std::unordered_map<int,int>>& index,
     int totalDocs)

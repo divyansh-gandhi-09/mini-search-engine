@@ -48,7 +48,7 @@ function renderPills(container, label, items, className) {
   });
 }
 
-// ---------- 🔍 Highlight Helper ----------
+// ----------  Highlight Helper ----------
 function highlightText(text, query) {
   if (!query) return text;
 
@@ -126,7 +126,7 @@ function renderResults(arr) {
     });
   });
 
-  // ❌ Delete document
+  //  Delete document
   document.querySelectorAll(".delete-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
@@ -223,7 +223,7 @@ async function performSearch() {
   }
 }
 
-// ---------- 📄 List All Documents ----------
+// ----------  List All Documents ----------
 async function listAllDocuments() {
   resultsEl.innerHTML = `<div class="muted">Loading documents...</div>`;
   try {
@@ -317,7 +317,7 @@ $("#upload-form").addEventListener("submit", async (e) => {
   let filename = filenameInput.value.trim();
   let content = contentInput.value.trim();
 
-  // ✅ If file chosen, read its content (override textarea if empty)
+  // If file chosen, read its content (override textarea if empty)
   if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
     filename = filename || file.name;
