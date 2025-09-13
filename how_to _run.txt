@@ -1,8 +1,9 @@
+make a folder "data" all files go there after indexed index.json will be generated 
 first for clean build - mingw32-make clean
 then build - mingw32-make
-use generate_test_docs with - python generate_test_docs.py --n 2000 --words 1000
+use generate_test_docs with - python generate_test_docs.py --n 2000 --words 1000 //uses natural language toolkit to gerate unique word and documents
 if need to delete all test document - python generate_test_docs.py --clean
 index.json will detect any changes in the data folder then reindex automatically so no need to delete it 
 to run the server - ./server.exe
 to run the console_main ,replace the server.cpp with console_main.cpp-
-g++ -I"header files" implementation/*.cpp -o main_console.exe and ./main_console.exe    
+g++ -I"header files" implementation/*.cpp -o main_console.exe and ./main_console.exe  
