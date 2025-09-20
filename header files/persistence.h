@@ -1,5 +1,4 @@
 #pragma once
-
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -14,6 +13,7 @@ public:
         const std::unordered_map<int, std::vector<std::string>>& docTokens,
         const std::unordered_map<int, std::string>& docMeta,
         const std::unordered_map<std::string, int>& vocabCount,
+        const std::unordered_map<int, std::string>& docIdToFolder, // NEW
         int docID
     );
 
@@ -24,6 +24,7 @@ public:
         std::unordered_map<int, std::vector<std::string>>& docTokens,
         std::unordered_map<int, std::string>& docMeta,
         std::unordered_map<std::string, int>& vocabCount,
+        std::unordered_map<int, std::string>& docIdToFolder, // NEW
         int& docID
     );
 };

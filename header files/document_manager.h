@@ -1,5 +1,4 @@
 #pragma once
-
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -18,51 +17,53 @@ private:
     std::unordered_map<int, std::string> docIdToRel;
     std::unordered_map<int, std::string> docMeta;
     std::unordered_map<std::string, int> vocabCount;
-    
+    std::unordered_map<int, std::string> docIdToFolder;
+
     Indexer indexer;
     Trie autoComplete;
     BKTree typoCorrector;
     std::unique_ptr<SearchEngine> engine;
     int docID;
 
+    // Helper function to extract folder from file path
+    std::string extractFolderFromPath(const std::string& filepath);
+
 public:
     DocumentManager();
-    
-    // Initialization
     bool initialize();
     void buildFreshIndex();
     void updateExistingIndex();
     void rebuildSearchStructures();
-    
-    // Document operations
-    int uploadDocument(const std::string& filename, const std::string& content);
+
+    int uploadDocument(const std::string& filename, const std::string& content, const std::string& folder = "");
     bool editDocument(int id, const std::string& newContent);
     bool deleteDocument(int id);
-    
-    // Query operations
+
     std::vector<std::string> getSuggestions(const std::string& prefix);
     std::vector<std::string> getCorrections(const std::string& word, int maxResults = 3);
     std::vector<std::pair<int, double>> search(const std::string& query) const;
-    
-    // Getters
+
     const std::unordered_map<int, std::string>& getDocIdToContent() const { return docIdToContent; }
     const std::unordered_map<int, std::string>& getDocIdToPath() const { return docIdToPath; }
     const std::unordered_map<int, std::string>& getDocIdToRel() const { return docIdToRel; }
     const std::unordered_map<int, std::vector<std::string>>& getDocTokens() const { return docTokens; }
     const std::unordered_map<int, std::string>& getDocMeta() const { return docMeta; }
     const std::unordered_map<std::string, int>& getVocabCount() const { return vocabCount; }
+    const std::unordered_map<int, std::string>& getDocIdToFolder() const { return docIdToFolder; }
+    std::string getFolder(int docId) const;
+
     const Indexer& getIndexer() const { return indexer; }
     int getDocID() const { return docID; }
-    
-    // For persistence
+
     void updateFromPersistence(
         const std::unordered_map<int, std::string>& loadedDocIdToPath,
         const std::unordered_map<int, std::string>& loadedDocIdToRel,
         const std::unordered_map<int, std::vector<std::string>>& loadedDocTokens,
         const std::unordered_map<int, std::string>& loadedDocMeta,
         const std::unordered_map<std::string, int>& loadedVocabCount,
+        const std::unordered_map<int, std::string>& loadedDocIdToFolder,
         int loadedDocID
     );
-    
+
     void saveIndex() const;
 };

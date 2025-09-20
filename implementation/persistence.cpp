@@ -13,6 +13,7 @@ void PersistenceManager::saveIndexToFile(
     const std::unordered_map<int, std::vector<std::string>>& docTokens,
     const std::unordered_map<int, std::string>& docMeta,
     const std::unordered_map<std::string, int>& vocabCount,
+    const std::unordered_map<int, std::string>& docIdToFolder,
     int docID
 ) {
     json j;
@@ -23,12 +24,12 @@ void PersistenceManager::saveIndexToFile(
     j["docTokens"] = docTokens;
     j["docMeta"] = docMeta;
     j["vocabCount"] = vocabCount;
+    j["docIdToFolder"] = docIdToFolder;
 
     std::ofstream out("index.json.tmp", std::ios::trunc | std::ios::binary);
     std::string jsonStr = j.dump();
     out.write(jsonStr.c_str(), jsonStr.size());
     out.close();
-
     fs::rename("index.json.tmp", "index.json");
 }
 
@@ -39,16 +40,14 @@ bool PersistenceManager::loadIndexFromFile(
     std::unordered_map<int, std::vector<std::string>>& docTokens,
     std::unordered_map<int, std::string>& docMeta,
     std::unordered_map<std::string, int>& vocabCount,
+    std::unordered_map<int, std::string>& docIdToFolder,
     int& docID
 ) {
     if (!fs::exists("index.json")) return false;
-
     std::ifstream in("index.json");
     if (!in.is_open()) return false;
 
-    json j;
-    in >> j;
-
+    json j; in >> j;
     try {
         docID = j["docID"].get<int>();
         docIdToPath = j["docIdToPath"].get<std::unordered_map<int, std::string>>();
@@ -56,9 +55,13 @@ bool PersistenceManager::loadIndexFromFile(
         docTokens = j["docTokens"].get<std::unordered_map<int, std::vector<std::string>>>();
         docMeta = j["docMeta"].get<std::unordered_map<int, std::string>>();
         vocabCount = j["vocabCount"].get<std::unordered_map<std::string, int>>();
-        indexer.setIndex(j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>());
-    } catch (...) {
-        return false;
-    }
+        if (j.contains("docIdToFolder"))
+            docIdToFolder = j["docIdToFolder"].get<std::unordered_map<int, std::string>>();
+        else
+            docIdToFolder.clear();
+        indexer.setIndex(
+            j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>()
+        );
+    } catch (...) { return false; }
     return true;
 }

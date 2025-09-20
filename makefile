@@ -1,19 +1,20 @@
 CXX = g++
 CXXFLAGS = -std=c++20 -g -I"header files" -Ithird_party -MMD -MP
-LDFLAGS = -lws2_32
 
-# Source files from both directories
-IMPL_SRC = $(wildcard implementation/*.cpp)
-HEADER_SRC = $(wildcard "header files"/*.cpp)
+# Platform-specific linker flags
+ifeq ($(OS),Windows_NT)
+	LDFLAGS = -lws2_32 -lstdc++fs
+else
+	LDFLAGS = -lstdc++fs -pthread
+endif
+
+# Sources: everything in implementation (includes server.cpp)
+SRC = $(wildcard implementation/*.cpp)
 
 BUILD_DIR = build
 
-# Object files for both source directories
-IMPL_OBJ = $(patsubst implementation/%.cpp,$(BUILD_DIR)/%.o,$(IMPL_SRC))
-HEADER_OBJ = $(patsubst header\ files/%.cpp,$(BUILD_DIR)/%.o,$(HEADER_SRC))
-
-# Combine all object files
-OBJ = $(IMPL_OBJ) $(HEADER_OBJ)
+# Object files
+OBJ = $(patsubst implementation/%.cpp,$(BUILD_DIR)/%.o,$(SRC))
 DEP = $(OBJ:.o=.d)
 
 SERVER = server.exe
@@ -23,19 +24,27 @@ all: $(SERVER)
 $(SERVER): $(OBJ)
 	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
 
-# Build rules for implementation directory
+# Build rules
 $(BUILD_DIR)/%.o: implementation/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Build rules for header files directory  
-$(BUILD_DIR)/%.o: "header files"/%.cpp | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
 $(BUILD_DIR):
+ifeq ($(OS),Windows_NT)
 	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+else
+	@mkdir -p $(BUILD_DIR)
+endif
 
 # Include dependency files
 -include $(DEP)
+
+# Debug build
+debug: CXXFLAGS += -DDEBUG -O0
+debug: $(SERVER)
+
+# Release build  
+release: CXXFLAGS += -DNDEBUG -O3
+release: clean $(SERVER)
 
 # Cross-platform clean
 ifeq ($(OS),Windows_NT)
@@ -47,11 +56,4 @@ clean:
 	rm -rf $(BUILD_DIR) $(SERVER)
 endif
 
-# Debug target to show variables
-debug:
-	@echo "IMPL_SRC: $(IMPL_SRC)"
-	@echo "HEADER_SRC: $(HEADER_SRC)"
-	@echo "OBJ: $(OBJ)"
-	@echo "DEP: $(DEP)"
-
-.PHONY: all clean debug
+.PHONY: all clean debug release

@@ -2,68 +2,154 @@
 #include "../third_party/json.hpp"
 #include <algorithm>
 #include <iostream>
+#include <filesystem>
+#include <sstream>
 
 using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 WebHandlers::WebHandlers(DocumentManager& manager) : docManager(manager) {}
 
 void WebHandlers::setupRoutes(httplib::Server& svr) {
     setupCORS(svr);
-    
-    // Static frontend
     svr.set_mount_point("/", "./public");
-    
-    // API routes
-    svr.Get("/health", [this](const httplib::Request& req, httplib::Response& res) {
-        handleHealth(req, res);
-    });
-    
-    svr.Get("/suggest", [this](const httplib::Request& req, httplib::Response& res) {
-        handleSuggest(req, res);
-    });
-    
-    svr.Get("/correct", [this](const httplib::Request& req, httplib::Response& res) {
-        handleCorrect(req, res);
-    });
-    
-    svr.Get("/search", [this](const httplib::Request& req, httplib::Response& res) {
-        handleSearch(req, res);
-    });
-    
-    svr.Get("/document", [this](const httplib::Request& req, httplib::Response& res) {
-        handleDocument(req, res);
-    });
-    
-    svr.Post("/upload", [this](const httplib::Request& req, httplib::Response& res) {
-        handleUpload(req, res);
-    });
-    
-    svr.Put(R"(/edit/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {
-        handleEdit(req, res);
-    });
-    
-    svr.Delete(R"(/delete/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {
-        handleDelete(req, res);
-    });
-    
-    svr.Get("/documents", [this](const httplib::Request& req, httplib::Response& res) {
-        handleDocuments(req, res);
-    });
+
+    svr.Get("/health", [this](const auto& req, auto& res) { handleHealth(req, res); });
+    svr.Get("/stats", [this](const auto& req, auto& res) { handleStats(req, res); });
+    svr.Get("/folders", [this](const auto& req, auto& res) { handleFolders(req, res); });
+    svr.Post("/folders", [this](const auto& req, auto& res) { handleCreateFolder(req, res); });
+    svr.Get("/suggest", [this](const auto& req, auto& res) { handleSuggest(req, res); });
+    svr.Get("/correct", [this](const auto& req, auto& res) { handleCorrect(req, res); });
+    svr.Get("/search", [this](const auto& req, auto& res) { handleSearch(req, res); });
+    svr.Get("/document", [this](const auto& req, auto& res) { handleDocument(req, res); });
+    svr.Post("/upload", [this](const auto& req, auto& res) { handleUpload(req, res); });
+    svr.Put(R"(/edit/(\d+))", [this](const auto& req, auto& res) { handleEdit(req, res); });
+    svr.Delete(R"(/delete/(\d+))", [this](const auto& req, auto& res) { handleDelete(req, res); });
+    svr.Get("/documents", [this](const auto& req, auto& res) { handleDocuments(req, res); });
+    svr.Post("/rebuild", [this](const auto& req, auto& res) { handleRebuild(req, res); });
+    svr.Put(R"(/documents/(\d+)/folder)", [this](const auto& req, auto& res) { handleMoveToFolder(req, res); });
 }
 
 void WebHandlers::setupCORS(httplib::Server& svr) {
-    svr.set_pre_routing_handler([](const httplib::Request&, httplib::Response& res) {
+    svr.set_pre_routing_handler([](const auto&, auto& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
         return httplib::Server::HandlerResponse::Unhandled;
     });
-    
-    svr.Options(".*", [](const httplib::Request&, httplib::Response&) { return; });
+    svr.Options(".*", [](const auto&, auto&) { return; });
 }
 
 void WebHandlers::handleHealth(const httplib::Request&, httplib::Response& res) {
     res.set_content(R"({"status":"ok"})", "application/json");
+}
+
+void WebHandlers::handleStats(const httplib::Request&, httplib::Response& res) {
+    json stats;
+    
+    // Document counts
+    stats["total_documents"] = docManager.getDocID();
+    stats["indexed_documents"] = docManager.getDocIdToPath().size();
+    stats["vocabulary_size"] = docManager.getVocabCount().size();
+    
+    // Folder stats
+    std::unordered_map<std::string, int> folderCounts;
+    int rootDocuments = 0;
+    
+    for (const auto& [id, folder] : docManager.getDocIdToFolder()) {
+        if (folder.empty()) {
+            rootDocuments++;
+        } else {
+            folderCounts[folder]++;
+        }
+    }
+    
+    stats["folders"] = json::array();
+    for (const auto& [folder, count] : folderCounts) {
+        stats["folders"].push_back({{"name", folder}, {"document_count", count}});
+    }
+    stats["root_documents"] = rootDocuments;
+    
+    // File type distribution
+    std::unordered_map<std::string, int> extensions;
+    for (const auto& [id, path] : docManager.getDocIdToPath()) {
+        fs::path p(path);
+        std::string ext = p.extension().string();
+        if (ext.empty()) ext = "no_extension";
+        extensions[ext]++;
+    }
+    
+    stats["file_types"] = json::array();
+    for (const auto& [ext, count] : extensions) {
+        stats["file_types"].push_back({{"extension", ext}, {"count", count}});
+    }
+    
+    // Size stats
+    size_t totalSize = 0;
+    for (const auto& [id, content] : docManager.getDocIdToContent()) {
+        totalSize += content.size();
+    }
+    stats["total_content_size"] = totalSize;
+    
+    res.set_content(stats.dump(), "application/json");
+}
+
+void WebHandlers::handleFolders(const httplib::Request&, httplib::Response& res) {
+    std::unordered_set<std::string> uniqueFolders;
+    for (const auto& [id, folder] : docManager.getDocIdToFolder()) {
+        if (!folder.empty()) uniqueFolders.insert(folder);
+    }
+    json j = json::array();
+    for (const auto& folder : uniqueFolders) {
+        j.push_back(folder);
+    }
+    res.set_content(j.dump(), "application/json");
+}
+
+void WebHandlers::handleCreateFolder(const httplib::Request& req, httplib::Response& res) {
+    try {
+        auto body = json::parse(req.body);
+        std::string folderName = body.value("name", "");
+        
+        if (folderName.empty()) {
+            res.status = 400;
+            res.set_content(R"({"error":"Folder name is required","success":false})", "application/json");
+            return;
+        }
+        
+        // Validate folder name
+        if (folderName.find("..") != std::string::npos || 
+            folderName.find("/") != std::string::npos || 
+            folderName.find("\\") != std::string::npos) {
+            res.status = 400;
+            res.set_content(R"({"error":"Invalid folder name. Cannot contain '..' or path separators","success":false})", "application/json");
+            return;
+        }
+        
+        std::string folderPath = "./data/" + folderName;
+        
+        if (fs::exists(folderPath)) {
+            res.status = 409;
+            res.set_content(R"({"error":"Folder already exists","success":false})", "application/json");
+            return;
+        }
+        
+        fs::create_directories(folderPath);
+        
+        res.set_content(json({
+            {"success", true},
+            {"message", "Folder created successfully"},
+            {"folder", folderName}
+        }).dump(), "application/json");
+        
+    } catch (const std::exception& e) {
+        res.status = 500;
+        res.set_content(json({
+            {"error", "Failed to create folder"},
+            {"details", e.what()},
+            {"success", false}
+        }).dump(), "application/json");
+    }
 }
 
 void WebHandlers::handleSuggest(const httplib::Request& req, httplib::Response& res) {
@@ -75,87 +161,191 @@ void WebHandlers::handleSuggest(const httplib::Request& req, httplib::Response& 
 void WebHandlers::handleCorrect(const httplib::Request& req, httplib::Response& res) {
     auto word = req.get_param_value("word");
     int maxResults = req.has_param("max") ? std::stoi(req.get_param_value("max")) : 3;
-    
     auto corrections = docManager.getCorrections(word, maxResults);
     res.set_content(json(corrections).dump(), "application/json");
 }
 
 void WebHandlers::handleSearch(const httplib::Request& req, httplib::Response& res) {
     auto query = req.get_param_value("query");
-    if (query.empty()) {
-        res.set_content("[]", "application/json");
-        return;
+    std::string folder = req.has_param("folder") ? req.get_param_value("folder") : "";
+    if (query.empty()) { 
+        res.set_content("[]", "application/json"); 
+        return; 
     }
+
+    auto results = docManager.search(query);
+    json j = json::array();
     
-    try {
-        auto results = docManager.search(query);
-        const auto& docContent = docManager.getDocIdToContent();
-        const auto& docPaths = docManager.getDocIdToPath();
-        const auto& docRels = docManager.getDocIdToRel();
+    for (const auto& [id, score] : results) {
+        // Apply folder filter if specified
+        if (!folder.empty() && docManager.getFolder(id) != folder) continue;
         
-        json j = json::array();
-        for (const auto& result : results) {
-            std::string content = docContent.at(result.first);
-            std::string preview = createPreview(content, query);
-            
-            j.push_back({
-                {"id", result.first},
-                {"score", result.second},
-                {"path", docPaths.at(result.first)},
-                {"url", docRels.at(result.first)},
-                {"preview", preview}
-            });
-        }
+        // Skip if document no longer exists
+        if (!docManager.getDocIdToContent().count(id)) continue;
         
-        res.set_content(j.dump(), "application/json");
-    } catch (const std::exception& e) {
-        res.status = 500;
-        res.set_content(json({{"error", e.what()}}).dump(), "application/json");
+        std::string content = docManager.getDocIdToContent().at(id);
+        std::string preview = createPreview(content, query);
+        
+        j.push_back({
+            {"id", id}, 
+            {"score", score},
+            {"path", docManager.getDocIdToPath().at(id)},
+            {"url", docManager.getDocIdToRel().at(id)},
+            {"folder", docManager.getFolder(id)},
+            {"preview", preview},
+            {"size", content.length()}
+        });
     }
+    res.set_content(j.dump(), "application/json");
 }
 
 void WebHandlers::handleDocument(const httplib::Request& req, httplib::Response& res) {
-    if (!req.has_param("id")) {
+    if (!req.has_param("id")) { 
+        res.status = 400; 
+        res.set_content(R"({"error":"Document ID required"})", "application/json");
+        return; 
+    }
+    
+    int id;
+    try {
+        id = std::stoi(req.get_param_value("id"));
+    } catch (const std::exception&) {
         res.status = 400;
+        res.set_content(R"({"error":"Invalid document ID"})", "application/json");
         return;
     }
     
-    int id = std::stoi(req.get_param_value("id"));
-    const auto& docPaths = docManager.getDocIdToPath();
-    const auto& docRels = docManager.getDocIdToRel();
-    const auto& docContent = docManager.getDocIdToContent();
-    
-    if (!docPaths.count(id)) {
-        res.status = 404;
-        return;
+    if (!docManager.getDocIdToPath().count(id)) { 
+        res.status = 404; 
+        res.set_content(R"({"error":"Document not found"})", "application/json");
+        return; 
     }
-    
+
     res.set_content(json({
         {"id", id},
-        {"path", docPaths.at(id)},
-        {"url", docRels.at(id)},
-        {"content", docContent.at(id)}
+        {"path", docManager.getDocIdToPath().at(id)},
+        {"url", docManager.getDocIdToRel().at(id)},
+        {"folder", docManager.getFolder(id)},
+        {"content", docManager.getDocIdToContent().at(id)},
+        {"size", docManager.getDocIdToContent().at(id).length()}
     }).dump(), "application/json");
 }
 
 void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& res) {
     try {
-        auto body = json::parse(req.body);
-        std::string filename = body["filename"];
-        std::string content = body["content"];
+        std::string filename, content, folder;
+
+        // Handle multipart form-data (file upload)
+        if (req.is_multipart_form_data()) {
+            auto file = req.get_file_value("file");
+            if (!file.filename.empty()) {
+                filename = req.has_param("filename") && !req.get_param_value("filename").empty() 
+                          ? req.get_param_value("filename") 
+                          : file.filename;
+                
+                folder = req.has_param("folder") ? req.get_param_value("folder") : "";
+
+                // Call Python extractor service
+                httplib::Client cli("127.0.0.1", 5000);
+                cli.set_connection_timeout(0, 300000);
+                cli.set_read_timeout(60, 0);
+                
+                httplib::MultipartFormDataItems items;
+                items.push_back({"file", file.content, file.filename, file.content_type});
+
+                auto extractorResponse = cli.Post("/extract", items);
+                if (!extractorResponse) {
+                    res.status = 500;
+                    res.set_content(R"({"error":"Could not reach extractor service. Make sure Python extractor is running on port 5000","success":false})", "application/json");
+                    return;
+                }
+
+                if (extractorResponse->status != 200) {
+                    res.status = 500;
+                    json error_json = {
+                        {"error", "Extractor service failed"},
+                        {"details", extractorResponse->body},
+                        {"success", false}
+                    };
+                    res.set_content(error_json.dump(), "application/json");
+                    return;
+                }
+
+                try {
+                    auto extractorJson = json::parse(extractorResponse->body);
+                    content = extractorJson.value("text", "");
+                    
+                    if (content.empty()) {
+                        res.status = 400;
+                        res.set_content(R"({"error":"No text could be extracted from the file","success":false})", "application/json");
+                        return;
+                    }
+                } catch (const json::parse_error& e) {
+                    res.status = 500;
+                    json error_json = {
+                        {"error", "Invalid response from extractor service"},
+                        {"details", e.what()},
+                        {"success", false}
+                    };
+                    res.set_content(error_json.dump(), "application/json");
+                    return;
+                }
+            } else {
+                res.status = 400;
+                res.set_content(R"({"error":"No file provided","success":false})", "application/json");
+                return;
+            }
+        } 
+        // Handle raw JSON (manual pasted content)
+        else {
+            try {
+                auto body = json::parse(req.body);
+                filename = body.value("filename", "");
+                content = body.value("content", "");
+                folder = body.value("folder", "");
+                
+                if (filename.empty() || content.empty()) {
+                    res.status = 400;
+                    res.set_content(R"({"error":"Both filename and content are required","success":false})", "application/json");
+                    return;
+                }
+            } catch (const json::parse_error& e) {
+                res.status = 400;
+                json error_json = {
+                    {"error", "Invalid JSON in request body"},
+                    {"details", e.what()},
+                    {"success", false}
+                };
+                res.set_content(error_json.dump(), "application/json");
+                return;
+            }
+        }
+
+        int newId = docManager.uploadDocument(filename, content, folder);
         
-        int newId = docManager.uploadDocument(filename, content);
+        // AUTO-UPDATE: Automatically update the index after upload
+        std::cout << "Auto-updating index after upload..." << std::endl;
+        docManager.updateExistingIndex();
         
-        res.set_content(json({
+        json response_json = {
             {"status", "uploaded"},
+            {"success", true},
             {"id", newId},
-            {"filename", filename}
-        }).dump(), "application/json");
+            {"filename", filename},
+            {"folder", folder},
+            {"extracted_chars", content.length()},
+            {"message", "Document uploaded and indexed successfully"}
+        };
+        res.set_content(response_json.dump(), "application/json");
+
     } catch (const std::exception& e) {
         res.status = 500;
-        res.set_content(json({
-            {"error", std::string("upload failed: ") + e.what()}
-        }).dump(), "application/json");
+        json error_json = {
+            {"error", "Upload failed"},
+            {"details", e.what()},
+            {"success", false}
+        };
+        res.set_content(error_json.dump(), "application/json");
     }
 }
 
@@ -163,19 +353,35 @@ void WebHandlers::handleEdit(const httplib::Request& req, httplib::Response& res
     try {
         int id = std::stoi(req.matches[1]);
         auto body = json::parse(req.body);
-        std::string newContent = body["content"];
         
-        if (!docManager.editDocument(id, newContent)) {
-            res.status = 404;
-            res.set_content(R"({"error":"document not found"})", "application/json");
+        if (!body.contains("content")) {
+            res.status = 400;
+            res.set_content(R"({"error":"Content field is required","success":false})", "application/json");
             return;
         }
         
-        res.set_content(json({{"status", "updated"}, {"id", id}}).dump(), "application/json");
+        if (!docManager.editDocument(id, body["content"])) {
+            res.status = 404;
+            res.set_content(R"({"error":"Document not found","success":false})", "application/json");
+            return;
+        }
+        
+        // AUTO-UPDATE: Automatically update the index after edit
+        std::cout << "Auto-updating index after edit..." << std::endl;
+        docManager.updateExistingIndex();
+        
+        res.set_content(json({
+            {"status", "updated"}, 
+            {"success", true},
+            {"id", id},
+            {"message", "Document updated successfully"}
+        }).dump(), "application/json");
     } catch (const std::exception& e) {
         res.status = 500;
         res.set_content(json({
-            {"error", std::string("edit failed: ") + e.what()}
+            {"error", "Edit failed"},
+            {"details", e.what()},
+            {"success", false}
         }).dump(), "application/json");
     }
 }
@@ -183,62 +389,167 @@ void WebHandlers::handleEdit(const httplib::Request& req, httplib::Response& res
 void WebHandlers::handleDelete(const httplib::Request& req, httplib::Response& res) {
     try {
         int id = std::stoi(req.matches[1]);
-        
         if (!docManager.deleteDocument(id)) {
             res.status = 404;
-            res.set_content(R"({"error":"document not found"})", "application/json");
+            res.set_content(R"({"error":"Document not found","success":false})", "application/json");
             return;
         }
         
-        res.set_content(json({{"status", "deleted"}, {"id", id}}).dump(), "application/json");
-        std::cout << "[INFO] Deleted document ID=" << id << "\n";
+        // AUTO-UPDATE: Automatically update the index after delete
+        std::cout << "Auto-updating index after delete..." << std::endl;
+        docManager.updateExistingIndex();
+        
+        res.set_content(json({
+            {"status", "deleted"}, 
+            {"success", true},
+            {"id", id},
+            {"message", "Document deleted successfully"}
+        }).dump(), "application/json");
     } catch (const std::exception& e) {
         res.status = 500;
         res.set_content(json({
-            {"error", std::string("delete failed: ") + e.what()}
+            {"error", "Delete failed"},
+            {"details", e.what()},
+            {"success", false}
         }).dump(), "application/json");
-        std::cerr << "[ERROR] Delete failed: " << e.what() << "\n";
     }
 }
 
-void WebHandlers::handleDocuments(const httplib::Request&, httplib::Response& res) {
-    const auto& docRels = docManager.getDocIdToRel();
-    const auto& docPaths = docManager.getDocIdToPath();
-    const auto& docContent = docManager.getDocIdToContent();  // Add this line
+void WebHandlers::handleMoveToFolder(const httplib::Request& req, httplib::Response& res) {
+    try {
+        int id = std::stoi(req.matches[1]);
+        auto body = json::parse(req.body);
+        
+        std::string newFolder = body.value("folder", "");
+        
+        if (!docManager.getDocIdToPath().count(id)) {
+            res.status = 404;
+            res.set_content(R"({"error":"Document not found","success":false})", "application/json");
+            return;
+        }
+        
+        // Get current document info
+        std::string currentPath = docManager.getDocIdToPath().at(id);
+        std::string filename = docManager.getDocIdToRel().at(id);
+        std::string content = docManager.getDocIdToContent().at(id);
+        
+        // Delete old document
+        docManager.deleteDocument(id);
+        
+        // Upload to new location
+        int newId = docManager.uploadDocument(filename, content, newFolder);
+        
+        // AUTO-UPDATE: Update index after move
+        std::cout << "Auto-updating index after folder move..." << std::endl;
+        docManager.updateExistingIndex();
+        
+        res.set_content(json({
+            {"status", "moved"},
+            {"success", true},
+            {"old_id", id},
+            {"new_id", newId},
+            {"folder", newFolder},
+            {"message", "Document moved to folder successfully"}
+        }).dump(), "application/json");
+        
+    } catch (const std::exception& e) {
+        res.status = 500;
+        res.set_content(json({
+            {"error", "Move failed"},
+            {"details", e.what()},
+            {"success", false}
+        }).dump(), "application/json");
+    }
+}
+
+void WebHandlers::handleDocuments(const httplib::Request& req, httplib::Response& res) {
+    std::string folderFilter = req.has_param("folder") ? req.get_param_value("folder") : "";
     
     json j = json::array();
     std::vector<int> ids;
-    for (auto& [id, _] : docRels) ids.push_back(id);
+    for (const auto& [id, _] : docManager.getDocIdToRel()) {
+        ids.push_back(id);
+    }
     std::sort(ids.begin(), ids.end());
     
     for (int id : ids) {
-        // Get content and create preview
-        std::string content = docContent.count(id) ? docContent.at(id) : "";
-        std::string preview = content.empty() ? "" : 
-            content.substr(0, std::min<size_t>(200, content.size()));
+        std::string folder = docManager.getFolder(id);
+        
+        // Apply folder filter if specified
+        if (!folderFilter.empty() && folder != folderFilter) {
+            continue;
+        }
+        
+        std::string content = docManager.getDocIdToContent().count(id)
+            ? docManager.getDocIdToContent().at(id) : "";
+        std::string preview = content.substr(0, std::min<size_t>(200, content.size()));
         
         j.push_back({
             {"id", id},
-            {"filename", docRels.at(id)},
-            {"path", docPaths.at(id)},
-            {"preview", preview},           // Add preview
-            {"content", content}            // Add full content (optional)
+            {"filename", docManager.getDocIdToRel().at(id)},
+            {"path", docManager.getDocIdToPath().at(id)},
+            {"folder", folder},
+            {"preview", preview},
+            {"size", content.length()}
         });
     }
-    
     res.set_content(j.dump(), "application/json");
 }
 
+void WebHandlers::handleRebuild(const httplib::Request& req, httplib::Response& res) {
+    try {
+        std::string action = "fresh"; // default
+        if (!req.body.empty()) {
+            auto body = json::parse(req.body);
+            action = body.value("action", "fresh");
+        }
+        
+        if (action == "fresh") {
+            std::cout << "Manual fresh index rebuild requested..." << std::endl;
+            docManager.buildFreshIndex();
+        } else if (action == "update") {
+            std::cout << "Manual index update requested..." << std::endl;
+            docManager.updateExistingIndex();
+        } else {
+            res.status = 400;
+            res.set_content(R"({"error":"Invalid action. Use 'fresh' or 'update'","success":false})", "application/json");
+            return;
+        }
+        
+        res.set_content(json({
+            {"status", "completed"},
+            {"success", true},
+            {"action", action},
+            {"message", "Index rebuild completed successfully"}
+        }).dump(), "application/json");
+        
+    } catch (const std::exception& e) {
+        res.status = 500;
+        res.set_content(json({
+            {"error", "Rebuild failed"},
+            {"details", e.what()},
+            {"success", false}
+        }).dump(), "application/json");
+    }
+}
+
 std::string WebHandlers::createPreview(const std::string& content, const std::string& query) {
-    auto pos = content.find(query);
-    std::string preview;
-    
-    if (pos != std::string::npos) {
-        size_t start = (pos > 50) ? pos - 50 : 0;
-        preview = content.substr(start, 200);
-    } else {
-        preview = content.substr(0, std::min<size_t>(200, content.size()));
+    if (query.empty()) {
+        return content.substr(0, std::min<size_t>(200, content.size()));
     }
     
-    return preview;
+    // Try to find query terms in content for better context
+    std::string lowerContent = content;
+    std::string lowerQuery = query;
+    std::transform(lowerContent.begin(), lowerContent.end(), lowerContent.begin(), ::tolower);
+    std::transform(lowerQuery.begin(), lowerQuery.end(), lowerQuery.begin(), ::tolower);
+    
+    auto pos = lowerContent.find(lowerQuery);
+    if (pos != std::string::npos) {
+        size_t start = (pos > 50) ? pos - 50 : 0;
+        size_t length = std::min<size_t>(200, content.size() - start);
+        return content.substr(start, length);
+    }
+    
+    return content.substr(0, std::min<size_t>(200, content.size()));
 }

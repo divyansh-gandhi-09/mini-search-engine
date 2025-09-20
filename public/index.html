@@ -1,50 +1,1065 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Mini Search Engine</title>
-  <link rel="stylesheet" href="styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Search Engine</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          margin: 0; 
+          color: #2c3e50; 
+          line-height: 1.6;
+          min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* Header */
+        .main-header {
+          text-align: center;
+          margin-bottom: 2rem;
+          background: white;
+          border-radius: 20px;
+          padding: 2rem;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .main-heading {
+          font-size: 2.5rem;
+          font-weight: 700;
+          color: #2c3e50;
+          margin: 0 0 1rem 0;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        
+        /* Stats */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 1rem;
+          margin-top: 1rem;
+        }
+        .stat-card {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 1rem;
+          border-radius: 12px;
+          text-align: center;
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .stat-number { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { font-size: 0.875rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        /* Search Section */
+        .search-section {
+          background: white;
+          border-radius: 20px;
+          padding: 2rem;
+          margin-bottom: 2rem;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .search-input-group {
+          display: flex;
+          gap: 0.75rem;
+          align-items: center;
+          flex-wrap: wrap;
+          margin-bottom: 1rem;
+        }
+        #search-box { 
+          flex: 1; 
+          min-width: 300px;
+          padding: 1rem 1.25rem; 
+          font-size: 1.1rem; 
+          border: 2px solid #e1e8ed; 
+          border-radius: 50px; 
+          outline: none;
+          transition: all 0.3s ease;
+          background: #f8fafc;
+        }
+        #search-box:focus { 
+          border-color: #667eea; 
+          background: white;
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        /* Buttons */
+        .btn {
+          padding: 1rem 1.5rem; 
+          border: none; 
+          border-radius: 50px; 
+          cursor: pointer; 
+          font-weight: 600;
+          font-size: 0.95rem;
+          transition: all 0.3s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          text-decoration: none;
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .btn-secondary {
+          background: #f8fafc;
+          color: #4a5568;
+          border: 2px solid #e1e8ed;
+        }
+        .btn-secondary:hover {
+          background: #e2e8f0;
+          border-color: #cbd5e0;
+          transform: translateY(-1px);
+        }
+        .btn-small {
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+        }
+        
+        /* Filter Controls */
+        .filter-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 1rem;
+          flex-wrap: wrap;
+          padding: 1rem;
+          background: #f8fafc;
+          border-radius: 12px;
+          margin-bottom: 1rem;
+        }
+        .filter-controls select, .filter-controls input {
+          padding: 0.5rem 1rem;
+          font-size: 0.95rem;
+          border: 2px solid #e1e8ed;
+          border-radius: 8px;
+          outline: none;
+          background: white;
+        }
+        
+        /* Pills */
+        .pill-row { 
+          margin: 0.75rem 0; 
+          min-height: 32px; 
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+        .pill { 
+          display: inline-block; 
+          padding: 0.5rem 1rem; 
+          border-radius: 20px; 
+          background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
+          color: #2d3748; 
+          cursor: pointer; 
+          user-select: none;
+          font-size: 0.875rem;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+        .pill:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        
+        /* Results */
+        .results-section {
+          background: white;
+          border-radius: 20px;
+          padding: 2rem;
+          margin-bottom: 2rem;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          min-height: 400px;
+        }
+        .result { 
+          background: white; 
+          padding: 1.5rem; 
+          margin: 1rem 0; 
+          border-radius: 16px; 
+          border: 1px solid #e2e8f0; 
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          transition: all 0.3s ease;
+        }
+        .result:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+          border-color: #667eea;
+        }
+        .result-title { font-weight: 600; font-size: 1.1rem; color: #2d3748; margin-bottom: 0.5rem; }
+        .result-path { font-size: 0.875rem; color: #718096; margin-bottom: 0.5rem; }
+        .folder-badge {
+          display: inline-block;
+          background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+          color: #2d3748;
+          font-size: 0.75rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 12px;
+          margin: 0.25rem 0;
+        }
+        .preview {
+          margin: 1rem 0;
+          font-size: 0.95rem;
+          color: #4a5568;
+          line-height: 1.6;
+          background: #f8fafc;
+          padding: 1rem;
+          border-radius: 8px;
+          border-left: 4px solid #667eea;
+        }
+        .result-actions {
+          display: flex;
+          gap: 0.5rem;
+          margin-top: 1rem;
+          flex-wrap: wrap;
+        }
+        .action-btn {
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .view-btn { background: #48bb78; color: white; }
+        .edit-btn { background: #4299e1; color: white; }
+        .delete-btn { background: #f56565; color: white; }
+        .move-folder-select { 
+          background: #f8f9fa; 
+          color: #495057; 
+          border: 1px solid #ced4da; 
+          font-size: 0.8rem;
+          padding: 0.4rem 0.6rem;
+        }
+        .action-btn:hover { transform: translateY(-1px); }
+        
+        /* Forms */
+        .management-section {
+          background: white;
+          border-radius: 20px;
+          padding: 2rem;
+          margin-bottom: 2rem;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .section-heading {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #2d3748;
+          margin: 0 0 1.5rem 0;
+          padding-bottom: 0.75rem;
+          border-bottom: 2px solid #e2e8f0;
+        }
+        .form-group {
+          margin-bottom: 1rem;
+        }
+        .form-group label {
+          display: block;
+          font-weight: 600;
+          color: #4a5568;
+          margin-bottom: 0.5rem;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+          width: 100%;
+          padding: 0.75rem;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 0.95rem;
+          transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+          outline: none;
+          border-color: #667eea;
+        }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+        
+        /* Modal */
+        .modal {
+          position: fixed;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
+          background: rgba(0,0,0,0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+        .modal-content {
+          background: white;
+          padding: 2rem;
+          border-radius: 12px;
+          max-width: 800px;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+        }
+        .modal h2 { margin-top: 0; }
+        .close {
+          float: right;
+          font-size: 28px;
+          cursor: pointer;
+        }
+        
+        /* Notifications */
+        .notification {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: white;
+          border-radius: 8px;
+          padding: 1rem;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          z-index: 1001;
+          border-left: 4px solid #48bb78;
+        }
+        .notification.error { border-left-color: #f56565; }
+        .notification.warning { border-left-color: #ed8936; }
+        
+        /* Utilities */
+        .loading-state, .error-state {
+          text-align: center;
+          padding: 3rem 1rem;
+          font-size: 1.1rem;
+          color: #718096;
+        }
+        .error-state { color: #e53e3e; }
+        .hidden { display: none; }
+        .muted { color: #718096; font-size: 0.875rem; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+          .container { padding: 1rem; }
+          .search-input-group { flex-direction: column; align-items: stretch; }
+          #search-box { min-width: auto; }
+          .filter-controls { flex-direction: column; align-items: stretch; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
 </head>
 <body>
-  <main class="container">
-    <!-- Main Heading -->
-    <h1 class="main-heading">Mini Search Engine 🔎</h1>
+    <div class="container">
+        <header class="main-header">
+            <h1 class="main-heading">Mini Search Engine</h1>
+            <div id="stats-display"></div>
+        </header>
+        
+        <!-- Search Section -->
+        <section class="search-section">
+            <form id="search-form">
+                <div class="search-input-group">
+                    <input type="text" id="search-box" placeholder="Search documents..." autocomplete="off">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <button type="button" id="all-btn" class="btn btn-secondary">Show All</button>
+                    <button type="button" id="info-btn" class="btn btn-secondary">Help</button>
+                </div>
+            </form>
 
-    <!-- Search Form -->
-    <form id="search-form">
-      <input id="search-box" type="text" placeholder="Type your query..." autocomplete="off" />
-      <button type="submit">Search</button>
-      <!--  Show All button -->
-      <button type="button" id="all-btn" class="info-btn">Show All</button>
-    </form>
+            <!-- Filter Controls -->
+            <div class="filter-controls">
+                <div>
+                    <label for="folder-filter">Filter by folder:</label>
+                    <select id="folder-filter">
+                        <option value="">All Folders</option>
+                    </select>
+                </div>
+                <div>
+                    <input type="text" id="new-folder-name" placeholder="New folder name">
+                    <button id="create-folder-btn" class="btn btn-secondary btn-small">Create Folder</button>
+                </div>
+                <div>
+                    <button id="rebuild-update" class="btn btn-secondary btn-small">Update Index</button>
+                    <button id="rebuild-fresh" class="btn btn-secondary btn-small">Rebuild Index</button>
+                </div>
+            </div>
 
-    <!-- Suggestions & Corrections -->
-    <div id="suggestions" class="pill-row"></div>
-    <div id="corrections" class="pill-row"></div>
+            <!-- Live Assistance -->
+            <div class="pill-row" id="suggestions"></div>
+            <div class="pill-row" id="corrections"></div>
+        </section>
 
-    <!-- Results Section -->
-    <h2 class="section-heading">📄 Search Results</h2>
-    <div id="results"></div>
+        <!-- Results Section -->
+        <section class="results-section">
+            <div id="results">
+                <div class="loading-state">Enter a search query or click "Show All" to see documents.</div>
+            </div>
+        </section>
 
-  <!-- Upload Section -->
-<h2 class="section-heading">📤 Upload New Document</h2>
-<form id="upload-form" class="action-form">
-  <input id="upload-filename" type="text" placeholder="Filename (e.g. notes.txt)" />
-  <textarea id="upload-content" placeholder="Document content..."></textarea>
-  <input id="upload-file" type="file" accept=".txt,.md,.csv,.log,.json" />
-  <button type="submit">Upload</button>
-</form>
+        <!-- Upload Section -->
+        <section class="management-section">
+            <h2 class="section-heading">Upload Documents</h2>
+            <form id="upload-form">
+                <div class="form-group">
+                    <label for="upload-file">Select File:</label>
+                    <input type="file" id="upload-file" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.txt,.md,.csv,.json,.log,.xml,.html,.doc,.docx">
+                </div>
+                <div class="form-group">
+                    <label for="upload-filename">Custom filename (optional):</label>
+                    <input type="text" id="upload-filename" placeholder="Leave empty to use original filename">
+                </div>
+                <div class="form-group">
+                    <label for="folder-select">Folder:</label>
+                    <select id="folder-select">
+                        <option value="">-- Select Folder --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="upload-content">Or paste text content here:</label>
+                    <textarea id="upload-content" placeholder="Paste text content for manual entry"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Upload Document</button>
+            </form>
+        </section>
 
+        <!-- Edit Section -->
+        <section class="management-section">
+            <h2 class="section-heading">Edit Document</h2>
+            <form id="edit-form">
+                <div class="form-group">
+                    <label for="edit-id">Document ID:</label>
+                    <input type="text" id="edit-id" placeholder="Click 'Edit' button on any result to auto-fill" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="edit-content">New content:</label>
+                    <textarea id="edit-content" placeholder="Enter the new document content"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </section>
+    </div>
 
-    <!-- Edit Section -->
-    <h2 class="section-heading">✏️ Edit Existing Document</h2>
-    <form id="edit-form" class="action-form">
-      <input id="edit-id" type="number" placeholder="Document ID" required />
-      <textarea id="edit-content" placeholder="New content..." required></textarea>
-      <button type="submit">Save Changes</button>
-    </form>
-  </main>
+    <script>
+        // DOM elements
+        const $ = (sel) => document.querySelector(sel);
+        const $$ = (sel) => document.querySelectorAll(sel);
+        const resultsEl = $("#results");
+        const suggEl = $("#suggestions");
+        const corrEl = $("#corrections");
+        const input = $("#search-box");
+        const form = $("#search-form");
+        const statsEl = $("#stats-display");
 
-  <script src="app.js"></script>
+        // Global state
+        let currentStats = null;
+        let isOnline = true;
+
+        // Utility functions
+        function debounce(fn, ms = 200) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn(...args), ms);
+            };
+        }
+
+        async function fetchJSON(url, options = {}) {
+            try {
+                const r = await fetch(url, options);
+                if (!r.ok) {
+                    let errorText;
+                    try {
+                        const errorData = await r.json();
+                        errorText = errorData.error || errorData.details || `HTTP ${r.status}`;
+                    } catch {
+                        errorText = await r.text() || `HTTP ${r.status}`;
+                    }
+                    throw new Error(errorText);
+                }
+                return r.json();
+            } catch (error) {
+                console.error("Fetch error:", error);
+                if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    isOnline = false;
+                    showNotification("Connection lost. Check if server is running.", "error");
+                }
+                throw error;
+            }
+        }
+
+        function showNotification(message, type = "info") {
+            const notification = document.createElement("div");
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()" style="float:right;background:none;border:none;font-size:18px;cursor:pointer;">×</button>
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function highlightText(text, query) {
+        if (!query) return text;
+        const terms = query.trim().split(/\s+/).filter(t => !['and', 'or'].includes(t.toLowerCase()));
+        let highlighted = text;
+        terms.forEach(term => {
+            const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            highlighted = highlighted.replace(regex, '<mark>$1</mark>');
+        });
+        return highlighted;
+    }
+
+        // Stats functions
+        async function loadStats() {
+            try {
+                currentStats = await fetchJSON("/stats");
+                displayStats();
+            } catch (e) {
+                console.error("Failed to load stats:", e);
+                if (statsEl) {
+                    statsEl.innerHTML = '<div class="error">Failed to load statistics</div>';
+                }
+            }
+        }
+
+        function displayStats() {
+            if (!currentStats || !statsEl) return;
+            const { indexed_documents, folders, vocabulary_size, total_content_size } = currentStats;
+            statsEl.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">${indexed_documents}</div>
+                        <div class="stat-label">Documents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${folders.length}</div>
+                        <div class="stat-label">Folders</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${vocabulary_size.toLocaleString()}</div>
+                        <div class="stat-label">Terms</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${formatFileSize(total_content_size)}</div>
+                        <div class="stat-label">Size</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Folder functions
+        async function loadFolders() {
+            try {
+                const folders = await fetchJSON("/folders");
+                const folderSelects = $$("#folder-select, #folder-filter");
+                
+                folderSelects.forEach(select => {
+                    const isFilter = select.id === "folder-filter";
+                    const currentValue = select.value;
+                    
+                    select.innerHTML = isFilter 
+                        ? `<option value="">All Folders</option>` 
+                        : `<option value="">-- Select Folder --</option>`;
+                    
+                    folders.forEach(f => {
+                        const option = document.createElement("option");
+                        option.value = f;
+                        option.textContent = f;
+                        if (f === currentValue) option.selected = true;
+                        select.appendChild(option);
+                    });
+                });
+            } catch (err) {
+                console.error("Failed to load folders:", err);
+                showNotification("Failed to load folders", "error");
+            }
+        }
+
+        async function createFolder() {
+            const folderName = $("#new-folder-name").value.trim();
+            if (!folderName) {
+                showNotification("Please enter a folder name", "warning");
+                return;
+            }
+
+            try {
+                const response = await fetch("/folders", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: folderName })
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || "Failed to create folder");
+                }
+
+                showNotification(`Folder "${folderName}" created successfully!`, "success");
+                $("#new-folder-name").value = "";
+                await loadFolders();
+            } catch (err) {
+                showNotification("Create folder failed: " + err.message, "error");
+            }
+        }
+
+        // Pills
+        function renderPills(container, label, items, className) {
+            if (!items || items.length === 0) {
+                container.innerHTML = "";
+                return;
+            }
+            container.innerHTML = `<span class="muted">${label}</span> ` +
+                items.map(w => `<span class="pill ${className}" data-val="${w}">${w}</span>`).join(" ");
+            
+            container.querySelectorAll(".pill").forEach(el => {
+                el.addEventListener("click", () => {
+                    input.value = el.dataset.val;
+                    performSearch();
+                });
+            });
+        }
+
+        // Live assistance
+        const liveAssist = debounce(async () => {
+            const q = input.value.trim();
+            if (q.length < 2) {
+                suggEl.innerHTML = "";
+                corrEl.innerHTML = "";
+                return;
+            }
+
+            try {
+                const s = await fetchJSON(`/suggest?prefix=${encodeURIComponent(q)}`);
+                renderPills(suggEl, "Suggestions:", s, "suggestion");
+            } catch (e) {
+                console.error("Suggestion error:", e);
+            }
+
+            if (!q.includes(" ")) {
+                try {
+                    const c = await fetchJSON(`/correct?word=${encodeURIComponent(q)}&max=3`);
+                    renderPills(corrEl, "Did you mean:", c, "correction");
+                } catch (e) {
+                    console.error("Correction error:", e);
+                }
+            } else {
+                corrEl.innerHTML = "";
+            }
+        }, 150);
+
+        input.addEventListener("input", liveAssist);
+
+        // Search and results
+        async function performSearch() {
+            const q = input.value.trim();
+            const folderFilter = $("#folder-filter")?.value || "";
+            
+            if (!q) {
+                showNotification("Please enter a search query", "warning");
+                return;
+            }
+            
+            resultsEl.innerHTML = `<div class="loading-state">Searching...</div>`;
+            
+            try {
+                let url = `/search?query=${encodeURIComponent(q)}`;
+                if (folderFilter) {
+                    url += `&folder=${encodeURIComponent(folderFilter)}`;
+                }
+                const data = await fetchJSON(url);
+                renderResults(data);
+                document.title = `Search: ${q} - Mini Search Engine`;
+            } catch (e) {
+                resultsEl.innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
+                showNotification("Search failed: " + e.message, "error");
+            }
+        }
+
+        async function listAllDocuments() {
+            resultsEl.innerHTML = `<div class="loading-state">Loading documents...</div>`;
+            
+            try {
+                const folderFilter = $("#folder-filter")?.value || "";
+                let url = "/documents";
+                if (folderFilter) {
+                    url += `?folder=${encodeURIComponent(folderFilter)}`;
+                }
+                const data = await fetchJSON(url);
+                renderResults(data);
+                document.title = "All Documents - Mini Search Engine";
+            } catch (e) {
+                resultsEl.innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
+                showNotification("Failed to load documents: " + e.message, "error");
+            }
+        }
+
+        function renderResults(arr) {
+            if (!arr || arr.length === 0) {
+                resultsEl.innerHTML = `
+                    <div class="loading-state">
+                        <div>No results found</div>
+                        <div class="muted">Try different keywords or check your spelling</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const q = input.value.trim();
+            const resultsHTML = arr.map((r, index) => `
+                <div class="result" data-id="${r.id}">
+                    <div class="result-title">${index + 1}. ${r.url || r.filename}</div>
+                    <div class="result-path muted">${r.path || ""}</div>
+                    <div class="muted">TF-IDF Score: ${r.score ? r.score.toFixed(3) : 'No score'} | Size: ${formatFileSize(r.size || 0)}</div>
+                    ${r.folder ? `<div class="folder-badge">📁 ${r.folder}</div>` : ''}
+                    <div class="preview">${highlightText(r.preview || r.content?.slice(0, 200) || "", q)}</div>
+                    <div class="result-actions">
+                        <button class="action-btn view-btn" data-id="${r.id}">View</button>
+                        <button class="action-btn edit-btn" data-id="${r.id}">Edit</button>
+                        <button class="action-btn delete-btn" data-id="${r.id}">Delete</button>
+                        <select class="action-btn move-folder-select" data-id="${r.id}">
+                            <option value="">Move to folder...</option>
+                        </select>
+                    </div>
+                </div>
+            `).join("");
+
+            resultsEl.innerHTML = resultsHTML;
+            
+            // Populate move-to-folder dropdowns
+            loadFolders().then(() => {
+                $$(".move-folder-select").forEach(select => {
+                    const folders = Array.from($("#folder-select option")).slice(1); // Skip "-- Select Folder --"
+                    folders.forEach(option => {
+                        const opt = document.createElement("option");
+                        opt.value = option.value;
+                        opt.textContent = option.textContent;
+                        select.appendChild(opt);
+                    });
+                    
+                    select.addEventListener("change", async (e) => {
+                        if (e.target.value) {
+                            await moveDocumentToFolder(e.target.dataset.id, e.target.value);
+                            e.target.value = ""; // Reset dropdown
+                        }
+                    });
+                });
+            });
+            
+            attachResultEventListeners();
+        }
+
+        function attachResultEventListeners() {
+            // View documents
+            $$(".view-btn").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = btn.dataset.id;
+                    try {
+                        const doc = await fetchJSON(`/document?id=${id}`);
+                        showModal(doc, input.value.trim());
+                    } catch (e) {
+                        showNotification("Error loading document: " + e.message, "error");
+                    }
+                });
+            });
+
+            // Edit documents
+            $$(".edit-btn").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = btn.dataset.id;
+                    try {
+                        const doc = await fetchJSON(`/document?id=${id}`);
+                        $("#edit-id").value = id;
+                        $("#edit-content").value = doc.content;
+                        $("#edit-form").scrollIntoView({ behavior: "smooth" });
+                        showNotification("Document loaded for editing", "success");
+                    } catch (e) {
+                        showNotification("Error loading document for edit: " + e.message, "error");
+                    }
+                });
+            });
+
+            // Delete documents
+            $$(".delete-btn").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = btn.dataset.id;
+                    const result = document.querySelector(`[data-id="${id}"]`);
+                    const filename = result?.querySelector('.result-title')?.textContent || `document ${id}`;
+                    
+                    if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) return;
+
+                    try {
+                        await fetchJSON(`/delete/${id}`, { method: "DELETE" });
+                        showNotification(`"${filename}" deleted successfully!`, "success");
+                        result?.remove();
+                        loadStats();
+                    } catch (e) {
+                        showNotification("Delete failed: " + e.message, "error");
+                    }
+                });
+            });
+        }
+
+        function showModal(doc, query) {
+            const modal = document.createElement("div");
+            modal.className = "modal";
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <h2>${doc.url || doc.filename}</h2>
+                    <div class="muted">Path: ${doc.path || ""}</div>
+                    ${doc.folder ? `<div class="muted">Folder: ${doc.folder}</div>` : ''}
+                    <div class="muted">Size: ${formatFileSize(doc.size || doc.content?.length || 0)}</div>
+                    <pre style="white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 400px; overflow-y: auto;">${highlightText(doc.content, query)}</pre>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            modal.querySelector(".close").onclick = () => modal.remove();
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        // Form handlers
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            performSearch();
+        });
+
+        $("#upload-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const fileInput = $("#upload-file");
+            const filenameInput = $("#upload-filename");
+            const contentInput = $("#upload-content");
+            const folderInput = $("#folder-select");
+
+            const folder = folderInput?.value || "";
+            let filename = filenameInput.value.trim();
+            let content = contentInput.value.trim();
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                filename = filename || file.name;
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("filename", filename);
+                if (folder) formData.append("folder", folder);
+
+                try {
+                    submitBtn.textContent = "Uploading...";
+                    submitBtn.disabled = true;
+
+                    const res = await fetch("/upload", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    const data = await res.json();
+                    
+                    if (!res.ok || !data.success) {
+                        throw new Error(data.error || "Upload failed");
+                    }
+
+                    showNotification(`"${data.filename}" uploaded successfully!`, "success");
+                    $("#upload-form").reset();
+                    await Promise.all([loadFolders(), loadStats()]);
+
+                } catch (err) {
+                    showNotification("Upload failed: " + err.message, "error");
+                } finally {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            } else if (content) {
+                filename = filename || "manual_note.txt";
+                
+                try {
+                    submitBtn.textContent = "Uploading...";
+                    submitBtn.disabled = true;
+
+                    const res = await fetch("/upload", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ filename, content, folder })
+                    });
+
+                    const data = await res.json();
+                    
+                    if (!res.ok || !data.success) {
+                        throw new Error(data.error || "Upload failed");
+                    }
+
+                    showNotification(`"${data.filename}" created successfully!`, "success");
+                    $("#upload-form").reset();
+                    await Promise.all([loadFolders(), loadStats()]);
+
+                } catch (err) {
+                    showNotification("Upload failed: " + err.message, "error");
+                } finally {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            } else {
+                showNotification("Please provide a file or enter content.", "warning");
+            }
+        });
+
+        $("#edit-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id = $("#edit-id").value.trim();
+            const content = $("#edit-content").value.trim();
+
+            if (!id || !content) {
+                showNotification("Please provide both ID and content.", "warning");
+                return;
+            }
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+
+            try {
+                submitBtn.textContent = "Saving...";
+                submitBtn.disabled = true;
+
+                const res = await fetch(`/edit/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await res.json();
+                
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || "Edit failed");
+                }
+
+                showNotification(`Document edited successfully!`, "success");
+                $("#edit-form").reset();
+                await loadStats();
+
+            } catch (err) {
+                showNotification("Edit failed: " + err.message, "error");
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        async function moveDocumentToFolder(docId, folderName) {
+            try {
+                const res = await fetch(`/documents/${docId}/folder`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ folder: folderName })
+                });
+
+                const data = await res.json();
+                
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || "Move failed");
+                }
+
+                showNotification(`Document moved to "${folderName}" folder successfully!`, "success");
+                
+                // Refresh current view and stats
+                await loadStats();
+                const currentQuery = input.value.trim();
+                if (currentQuery) {
+                    setTimeout(performSearch, 500);
+                } else {
+                    setTimeout(listAllDocuments, 500);
+                }
+                
+            } catch (err) {
+                showNotification("Move failed: " + err.message, "error");
+            }
+        }
+
+        // Event listeners
+        $("#all-btn").addEventListener("click", listAllDocuments);
+        $("#info-btn").addEventListener("click", () => {
+            alert("Search Help:\n\n• Use AND/OR between terms\n• Get suggestions as you type\n• Upload various file formats\n• Organize with folders\n• Create folders from the interface");
+        });
+        $("#create-folder-btn").addEventListener("click", createFolder);
+        
+        $("#folder-filter").addEventListener("change", () => {
+            const currentQuery = input.value.trim();
+            if (currentQuery) {
+                performSearch();
+            } else {
+                listAllDocuments();
+            }
+        });
+
+        $("#rebuild-update").addEventListener("click", async () => {
+            if (!confirm("Update search index? This may take some time.")) return;
+            try {
+                showNotification("Updating index...", "info");
+                await fetch("/rebuild", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "update" })
+                });
+                showNotification("Index updated successfully!", "success");
+                await Promise.all([loadFolders(), loadStats()]);
+            } catch (err) {
+                showNotification("Index update failed: " + err.message, "error");
+            }
+        });
+
+        $("#rebuild-fresh").addEventListener("click", async () => {
+            if (!confirm("Completely rebuild search index? This will take some time.")) return;
+            try {
+                showNotification("Rebuilding index...", "info");
+                await fetch("/rebuild", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "fresh" })
+                });
+                showNotification("Index rebuilt successfully!", "success");
+                await Promise.all([loadFolders(), loadStats()]);
+            } catch (err) {
+                showNotification("Index rebuild failed: " + err.message, "error");
+            }
+        });
+
+        // Initialize
+        document.addEventListener("DOMContentLoaded", async () => {
+            console.log("Mini Search Engine initialized");
+            
+            await Promise.all([loadFolders(), loadStats()]);
+            input.focus();
+
+            // Check server connectivity
+            try {
+                await fetchJSON("/health");
+                isOnline = true;
+                showNotification("Connected to search engine", "success");
+            } catch (e) {
+                isOnline = false;
+                showNotification("Cannot connect to server. Please check if it's running.", "error");
+            }
+
+            // Keyboard shortcuts
+            document.addEventListener("keydown", (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+                    e.preventDefault();
+                    input.focus();
+                    input.select();
+                }
+                
+                if (e.key === "Escape") {
+                    input.blur();
+                    // Close any open modals
+                    const modals = $(".modal");
+                    modals.forEach(modal => modal.remove());
+                }
+            });
+        });
+    </script>
 </body>
 </html>
