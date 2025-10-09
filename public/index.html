@@ -338,6 +338,248 @@
           .filter-controls { flex-direction: column; align-items: stretch; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
+        /* Enhanced Modal Styles */
+.info-modal {
+  max-width: 900px;
+  max-height: 85vh;
+}
+
+.info-content {
+  padding: 1rem 0;
+}
+
+.info-content h3 {
+  color: #667eea;
+  
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+
+.info-content h3:first-child {
+  margin-top: 0;
+}
+
+.info-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.info-list li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f7fafc;
+  line-height: 1.6;
+}
+
+.info-list li:last-child {
+  border-bottom: none;
+}
+
+.info-list code {
+  background: #f7fafc;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: #e53e3e;
+  font-family: 'Courier New', monospace;
+}
+
+/* Large File Warning */
+.large-file-warning {
+  background: linear-gradient(135deg, #fef5e7 0%, #fdebd0 100%);
+  color: #856404;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  border-left: 4px solid #f39c12;
+  font-weight: 600;
+}
+
+/* Document Content Wrapper */
+.doc-content-wrapper {
+  margin-top: 1.5rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.doc-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #2d3748;
+}
+
+.doc-text mark {
+  background: linear-gradient(135deg, #fff59d 0%, #ffeb3b 100%);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.modal-btn {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.modal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+/* Modal Meta Improvements */
+.modal-meta {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  border-left: 4px solid #667eea;
+}
+
+.modal-meta .muted {
+  margin: 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+/* Notification Styles */
+#notifications {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+}
+
+.notification {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid #48bb78;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: slideIn 0.3s ease;
+}
+
+.notification.error {
+  border-left-color: #f56565;
+}
+
+.notification.warning {
+  border-left-color: #ed8936;
+}
+
+.notification.info {
+  border-left-color: #4299e1;
+}
+
+.notification .close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #718096;
+  padding: 0;
+  margin-left: 1rem;
+  line-height: 1;
+}
+
+.notification .close-btn:hover {
+  color: #2d3748;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Loading Indicator */
+#loading-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Modal */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+    padding: 1.5rem;
+  }
+  
+  .info-modal {
+    max-width: 95%;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-btn {
+    width: 100%;
+  }
+}
     </style>
 </head>
 <body>
@@ -430,670 +672,40 @@
             </form>
         </section>
     </div>
+    <!-- Help Modal -->
+<div id="help-modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Help & Technical Overview</h2>
 
-    <script>
-        // DOM elements
-        const $ = (sel) => document.querySelector(sel);
-        const $$ = (sel) => document.querySelectorAll(sel);
-        const resultsEl = $("#results");
-        const suggEl = $("#suggestions");
-        const corrEl = $("#corrections");
-        const input = $("#search-box");
-        const form = $("#search-form");
-        const statsEl = $("#stats-display");
+    <h3>Search Engine Overview</h3>
+    <p>This mini search engine allows you to store, organize, and search documents efficiently using modern information retrieval techniques.</p>
 
-        // Global state
-        let currentStats = null;
-        let isOnline = true;
+    <h3>Core Features</h3>
+    <ul>
+      <li><strong>TF-IDF Ranking:</strong> Each document is vectorized using Term Frequency–Inverse Document Frequency, enabling relevance scoring based on query terms.</li>
+      <li><strong>Autocomplete:</strong> As you type, the system suggests possible query completions using prefix-based search structures for fast lookup.</li>
+      <li><strong>Spelling Correction (BK-Tree):</strong> Typo-tolerant correction is implemented via a Burkhard-Keller Tree, which finds the closest word matches by edit distance.</li>
+      <li><strong>Folder Organization:</strong> Documents can be grouped into folders for more efficient searching and management.</li>
+      <li><strong>Index Rebuild:</strong> You can refresh or rebuild the index at any time to incorporate new or modified documents.</li>
+      <li><strong>Metadata Tracking:</strong> The system tracks document IDs, names, and folders for quick retrieval and management operations.</li>
+    </ul>
 
-        // Utility functions
-        function debounce(fn, ms = 200) {
-            let t;
-            return (...args) => {
-                clearTimeout(t);
-                t = setTimeout(() => fn(...args), ms);
-            };
-        }
+    <h3>Usage Instructions</h3>
+    <ul>
+      <li><strong>Search:</strong> Enter a term or phrase and press <em>Search</em> to view ranked results. use 'and' / 'or' between terms to get boolean results</li>
+      <li><strong>Show All:</strong> Displays all indexed documents.</li>
+      <li><strong>Upload:</strong> Add new documents or text content manually.</li>
+      <li><strong>Edit:</strong> Modify existing document content.</li>
+      <li><strong>Delete:</strong> Permanently remove a document from the index.</li>
+      <li><strong>Update/Rebuild Index:</strong> Refresh the TF-IDF and BK-Tree structures when data changes significantly.</li>
+    </ul>
 
-        async function fetchJSON(url, options = {}) {
-            try {
-                const r = await fetch(url, options);
-                if (!r.ok) {
-                    let errorText;
-                    try {
-                        const errorData = await r.json();
-                        errorText = errorData.error || errorData.details || `HTTP ${r.status}`;
-                    } catch {
-                        errorText = await r.text() || `HTTP ${r.status}`;
-                    }
-                    throw new Error(errorText);
-                }
-                return r.json();
-            } catch (error) {
-                console.error("Fetch error:", error);
-                if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                    isOnline = false;
-                    showNotification("Connection lost. Check if server is running.", "error");
-                }
-                throw error;
-            }
-        }
+    <button id="close-help" class="btn btn-secondary">Close</button>
+  </div>
+</div>
 
-        function showNotification(message, type = "info") {
-            const notification = document.createElement("div");
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <span>${message}</span>
-                <button onclick="this.parentElement.remove()" style="float:right;background:none;border:none;font-size:18px;cursor:pointer;">×</button>
-            `;
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 5000);
-        }
 
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
 
-        function highlightText(text, query) {
-        if (!query) return text;
-        const terms = query.trim().split(/\s+/).filter(t => !['and', 'or'].includes(t.toLowerCase()));
-        let highlighted = text;
-        terms.forEach(term => {
-            const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-            highlighted = highlighted.replace(regex, '<mark>$1</mark>');
-        });
-        return highlighted;
-    }
-
-        // Stats functions
-        async function loadStats() {
-            try {
-                currentStats = await fetchJSON("/stats");
-                displayStats();
-            } catch (e) {
-                console.error("Failed to load stats:", e);
-                if (statsEl) {
-                    statsEl.innerHTML = '<div class="error">Failed to load statistics</div>';
-                }
-            }
-        }
-
-        function displayStats() {
-            if (!currentStats || !statsEl) return;
-            const { indexed_documents, folders, vocabulary_size, total_content_size } = currentStats;
-            statsEl.innerHTML = `
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-number">${indexed_documents}</div>
-                        <div class="stat-label">Documents</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${folders.length}</div>
-                        <div class="stat-label">Folders</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${vocabulary_size.toLocaleString()}</div>
-                        <div class="stat-label">Terms</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${formatFileSize(total_content_size)}</div>
-                        <div class="stat-label">Size</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Folder functions
-        async function loadFolders() {
-            try {
-                const folders = await fetchJSON("/folders");
-                const folderSelects = $$("#folder-select, #folder-filter");
-                
-                folderSelects.forEach(select => {
-                    const isFilter = select.id === "folder-filter";
-                    const currentValue = select.value;
-                    
-                    select.innerHTML = isFilter 
-                        ? `<option value="">All Folders</option>` 
-                        : `<option value="">-- Select Folder --</option>`;
-                    
-                    folders.forEach(f => {
-                        const option = document.createElement("option");
-                        option.value = f;
-                        option.textContent = f;
-                        if (f === currentValue) option.selected = true;
-                        select.appendChild(option);
-                    });
-                });
-            } catch (err) {
-                console.error("Failed to load folders:", err);
-                showNotification("Failed to load folders", "error");
-            }
-        }
-
-        async function createFolder() {
-            const folderName = $("#new-folder-name").value.trim();
-            if (!folderName) {
-                showNotification("Please enter a folder name", "warning");
-                return;
-            }
-
-            try {
-                const response = await fetch("/folders", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: folderName })
-                });
-
-                const data = await response.json();
-                
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || "Failed to create folder");
-                }
-
-                showNotification(`Folder "${folderName}" created successfully!`, "success");
-                $("#new-folder-name").value = "";
-                await loadFolders();
-            } catch (err) {
-                showNotification("Create folder failed: " + err.message, "error");
-            }
-        }
-
-        // Pills
-        function renderPills(container, label, items, className) {
-            if (!items || items.length === 0) {
-                container.innerHTML = "";
-                return;
-            }
-            container.innerHTML = `<span class="muted">${label}</span> ` +
-                items.map(w => `<span class="pill ${className}" data-val="${w}">${w}</span>`).join(" ");
-            
-            container.querySelectorAll(".pill").forEach(el => {
-                el.addEventListener("click", () => {
-                    input.value = el.dataset.val;
-                    performSearch();
-                });
-            });
-        }
-
-        // Live assistance
-        const liveAssist = debounce(async () => {
-            const q = input.value.trim();
-            if (q.length < 2) {
-                suggEl.innerHTML = "";
-                corrEl.innerHTML = "";
-                return;
-            }
-
-            try {
-                const s = await fetchJSON(`/suggest?prefix=${encodeURIComponent(q)}`);
-                renderPills(suggEl, "Suggestions:", s, "suggestion");
-            } catch (e) {
-                console.error("Suggestion error:", e);
-            }
-
-            if (!q.includes(" ")) {
-                try {
-                    const c = await fetchJSON(`/correct?word=${encodeURIComponent(q)}&max=3`);
-                    renderPills(corrEl, "Did you mean:", c, "correction");
-                } catch (e) {
-                    console.error("Correction error:", e);
-                }
-            } else {
-                corrEl.innerHTML = "";
-            }
-        }, 150);
-
-        input.addEventListener("input", liveAssist);
-
-        // Search and results
-        async function performSearch() {
-            const q = input.value.trim();
-            const folderFilter = $("#folder-filter")?.value || "";
-            
-            if (!q) {
-                showNotification("Please enter a search query", "warning");
-                return;
-            }
-            
-            resultsEl.innerHTML = `<div class="loading-state">Searching...</div>`;
-            
-            try {
-                let url = `/search?query=${encodeURIComponent(q)}`;
-                if (folderFilter) {
-                    url += `&folder=${encodeURIComponent(folderFilter)}`;
-                }
-                const data = await fetchJSON(url);
-                renderResults(data);
-                document.title = `Search: ${q} - Mini Search Engine`;
-            } catch (e) {
-                resultsEl.innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
-                showNotification("Search failed: " + e.message, "error");
-            }
-        }
-
-        async function listAllDocuments() {
-            resultsEl.innerHTML = `<div class="loading-state">Loading documents...</div>`;
-            
-            try {
-                const folderFilter = $("#folder-filter")?.value || "";
-                let url = "/documents";
-                if (folderFilter) {
-                    url += `?folder=${encodeURIComponent(folderFilter)}`;
-                }
-                const data = await fetchJSON(url);
-                renderResults(data);
-                document.title = "All Documents - Mini Search Engine";
-            } catch (e) {
-                resultsEl.innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
-                showNotification("Failed to load documents: " + e.message, "error");
-            }
-        }
-
-        function renderResults(arr) {
-            if (!arr || arr.length === 0) {
-                resultsEl.innerHTML = `
-                    <div class="loading-state">
-                        <div>No results found</div>
-                        <div class="muted">Try different keywords or check your spelling</div>
-                    </div>
-                `;
-                return;
-            }
-            
-            const q = input.value.trim();
-            const resultsHTML = arr.map((r, index) => `
-                <div class="result" data-id="${r.id}">
-                    <div class="result-title">${index + 1}. ${r.url || r.filename}</div>
-                    <div class="result-path muted">${r.path || ""}</div>
-                    <div class="muted">TF-IDF Score: ${r.score ? r.score.toFixed(3) : 'No score'} | Size: ${formatFileSize(r.size || 0)}</div>
-                    ${r.folder ? `<div class="folder-badge">📁 ${r.folder}</div>` : ''}
-                    <div class="preview">${highlightText(r.preview || r.content?.slice(0, 200) || "", q)}</div>
-                    <div class="result-actions">
-                        <button class="action-btn view-btn" data-id="${r.id}">View</button>
-                        <button class="action-btn edit-btn" data-id="${r.id}">Edit</button>
-                        <button class="action-btn delete-btn" data-id="${r.id}">Delete</button>
-                        <select class="action-btn move-folder-select" data-id="${r.id}">
-                            <option value="">Move to folder...</option>
-                        </select>
-                    </div>
-                </div>
-            `).join("");
-
-            resultsEl.innerHTML = resultsHTML;
-            
-            // Populate move-to-folder dropdowns
-            loadFolders().then(() => {
-                $$(".move-folder-select").forEach(select => {
-                    const folders = Array.from($("#folder-select option")).slice(1); // Skip "-- Select Folder --"
-                    folders.forEach(option => {
-                        const opt = document.createElement("option");
-                        opt.value = option.value;
-                        opt.textContent = option.textContent;
-                        select.appendChild(opt);
-                    });
-                    
-                    select.addEventListener("change", async (e) => {
-                        if (e.target.value) {
-                            await moveDocumentToFolder(e.target.dataset.id, e.target.value);
-                            e.target.value = ""; // Reset dropdown
-                        }
-                    });
-                });
-            });
-            
-            attachResultEventListeners();
-        }
-
-        function attachResultEventListeners() {
-            // View documents
-            $$(".view-btn").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const id = btn.dataset.id;
-                    try {
-                        const doc = await fetchJSON(`/document?id=${id}`);
-                        showModal(doc, input.value.trim());
-                    } catch (e) {
-                        showNotification("Error loading document: " + e.message, "error");
-                    }
-                });
-            });
-
-            // Edit documents
-            $$(".edit-btn").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const id = btn.dataset.id;
-                    try {
-                        const doc = await fetchJSON(`/document?id=${id}`);
-                        $("#edit-id").value = id;
-                        $("#edit-content").value = doc.content;
-                        $("#edit-form").scrollIntoView({ behavior: "smooth" });
-                        showNotification("Document loaded for editing", "success");
-                    } catch (e) {
-                        showNotification("Error loading document for edit: " + e.message, "error");
-                    }
-                });
-            });
-
-            // Delete documents
-            $$(".delete-btn").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const id = btn.dataset.id;
-                    const result = document.querySelector(`[data-id="${id}"]`);
-                    const filename = result?.querySelector('.result-title')?.textContent || `document ${id}`;
-                    
-                    if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) return;
-
-                    try {
-                        await fetchJSON(`/delete/${id}`, { method: "DELETE" });
-                        showNotification(`"${filename}" deleted successfully!`, "success");
-                        result?.remove();
-                        loadStats();
-                    } catch (e) {
-                        showNotification("Delete failed: " + e.message, "error");
-                    }
-                });
-            });
-        }
-
-    function showModal(doc, query) {
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    
-    // Check if content is too large (over 100KB)
-    const isLargeFile = doc.content && doc.content.length > 100000;
-    const displayContent = isLargeFile ? 
-        doc.content.substring(0, 50000) + "\n\n... [Content truncated - file too large for display] ..." :
-        doc.content;
-    
-    modal.innerHTML = `
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>${doc.url || doc.filename}</h2>
-            <div class="muted">Path: ${doc.path || ""}</div>
-            ${doc.folder ? `<div class="muted">Folder: ${doc.folder}</div>` : ''}
-            <div class="muted">Size: ${formatFileSize(doc.size || doc.content?.length || 0)}</div>
-            ${isLargeFile ? '<div style="color: orange; margin: 1rem 0;">⚠️ Large file - showing first 50KB only</div>' : ''}
-            <div class="modal-actions">
-                <button onclick="copyToClipboard(\`${(displayContent || '').replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)">📋 Copy Visible Content</button>
-                <button onclick="downloadDocument('${doc.url || doc.filename}', \`${(doc.content || '').replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)">💾 Download Full File</button>
-            </div>
-            <pre style="white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 400px; overflow-y: auto;">${highlightText(displayContent || '', query)}</pre>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    modal.querySelector(".close").onclick = () => modal.remove();
-    modal.addEventListener("click", (e) => {
-        if (e.target === modal) modal.remove();
-    });
-    
-    // Add copy and download functions if they don't exist
-    window.copyToClipboard = window.copyToClipboard || function(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            showNotification("Content copied to clipboard", "success");
-        }).catch(() => {
-            showNotification("Failed to copy content", "error");
-        });
-    };
-    
-    window.downloadDocument = window.downloadDocument || function(filename, content) {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        showNotification("Document downloaded", "success");
-    };
-}
-
-        // Form handlers
-        form.addEventListener("submit", (e) => {
-            e.preventDefault();
-            performSearch();
-        });
-
-        $("#upload-form").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const fileInput = $("#upload-file");
-            const filenameInput = $("#upload-filename");
-            const contentInput = $("#upload-content");
-            const folderInput = $("#folder-select");
-
-            const folder = folderInput?.value || "";
-            let filename = filenameInput.value.trim();
-            let content = contentInput.value.trim();
-
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-
-            if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                filename = filename || file.name;
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("filename", filename);
-                if (folder) formData.append("folder", folder);
-
-                try {
-                    submitBtn.textContent = "Uploading...";
-                    submitBtn.disabled = true;
-
-                    const res = await fetch("/upload", {
-                        method: "POST",
-                        body: formData
-                    });
-
-                    const data = await res.json();
-                    
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.error || "Upload failed");
-                    }
-
-                    showNotification(`"${data.filename}" uploaded successfully!`, "success");
-                    $("#upload-form").reset();
-                    await Promise.all([loadFolders(), loadStats()]);
-
-                } catch (err) {
-                    showNotification("Upload failed: " + err.message, "error");
-                } finally {
-                    submitBtn.textContent = originalText;
-                    submitBtn.disabled = false;
-                }
-            } else if (content) {
-                filename = filename || "manual_note.txt";
-                
-                try {
-                    submitBtn.textContent = "Uploading...";
-                    submitBtn.disabled = true;
-
-                    const res = await fetch("/upload", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ filename, content, folder })
-                    });
-
-                    const data = await res.json();
-                    
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.error || "Upload failed");
-                    }
-
-                    showNotification(`"${data.filename}" created successfully!`, "success");
-                    $("#upload-form").reset();
-                    await Promise.all([loadFolders(), loadStats()]);
-
-                } catch (err) {
-                    showNotification("Upload failed: " + err.message, "error");
-                } finally {
-                    submitBtn.textContent = originalText;
-                    submitBtn.disabled = false;
-                }
-            } else {
-                showNotification("Please provide a file or enter content.", "warning");
-            }
-        });
-
-        $("#edit-form").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const id = $("#edit-id").value.trim();
-            const content = $("#edit-content").value.trim();
-
-            if (!id || !content) {
-                showNotification("Please provide both ID and content.", "warning");
-                return;
-            }
-
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-
-            try {
-                submitBtn.textContent = "Saving...";
-                submitBtn.disabled = true;
-
-                const res = await fetch(`/edit/${id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ content })
-                });
-
-                const data = await res.json();
-                
-                if (!res.ok || !data.success) {
-                    throw new Error(data.error || "Edit failed");
-                }
-
-                showNotification(`Document edited successfully!`, "success");
-                $("#edit-form").reset();
-                await loadStats();
-
-            } catch (err) {
-                showNotification("Edit failed: " + err.message, "error");
-            } finally {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            }
-        });
-
-        async function moveDocumentToFolder(docId, folderName) {
-            try {
-                const res = await fetch(`/documents/${docId}/folder`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ folder: folderName })
-                });
-
-                const data = await res.json();
-                
-                if (!res.ok || !data.success) {
-                    throw new Error(data.error || "Move failed");
-                }
-
-                showNotification(`Document moved to "${folderName}" folder successfully!`, "success");
-                
-                // Refresh current view and stats
-                await loadStats();
-                const currentQuery = input.value.trim();
-                if (currentQuery) {
-                    setTimeout(performSearch, 500);
-                } else {
-                    setTimeout(listAllDocuments, 500);
-                }
-                
-            } catch (err) {
-                showNotification("Move failed: " + err.message, "error");
-            }
-        }
-
-        // Event listeners
-        $("#all-btn").addEventListener("click", listAllDocuments);
-        $("#info-btn").addEventListener("click", () => {
-            alert("Search Help:\n\n• Use AND/OR between terms\n• Get suggestions as you type\n• Upload various file formats\n• Organize with folders\n• Create folders from the interface");
-        });
-        $("#create-folder-btn").addEventListener("click", createFolder);
-        
-        $("#folder-filter").addEventListener("change", () => {
-            const currentQuery = input.value.trim();
-            if (currentQuery) {
-                performSearch();
-            } else {
-                listAllDocuments();
-            }
-        });
-
-        $("#rebuild-update").addEventListener("click", async () => {
-            if (!confirm("Update search index? This may take some time.")) return;
-            try {
-                showNotification("Updating index...", "info");
-                await fetch("/rebuild", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "update" })
-                });
-                showNotification("Index updated successfully!", "success");
-                await Promise.all([loadFolders(), loadStats()]);
-            } catch (err) {
-                showNotification("Index update failed: " + err.message, "error");
-            }
-        });
-
-        $("#rebuild-fresh").addEventListener("click", async () => {
-            if (!confirm("Completely rebuild search index? This will take some time.")) return;
-            try {
-                showNotification("Rebuilding index...", "info");
-                await fetch("/rebuild", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "fresh" })
-                });
-                showNotification("Index rebuilt successfully!", "success");
-                await Promise.all([loadFolders(), loadStats()]);
-            } catch (err) {
-                showNotification("Index rebuild failed: " + err.message, "error");
-            }
-        });
-
-        // Initialize
-        document.addEventListener("DOMContentLoaded", async () => {
-            console.log("Mini Search Engine initialized");
-            
-            await Promise.all([loadFolders(), loadStats()]);
-            input.focus();
-
-            // Check server connectivity
-            try {
-                await fetchJSON("/health");
-                isOnline = true;
-                showNotification("Connected to search engine", "success");
-            } catch (e) {
-                isOnline = false;
-                showNotification("Cannot connect to server. Please check if it's running.", "error");
-            }
-
-            // Keyboard shortcuts
-            document.addEventListener("keydown", (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-                    e.preventDefault();
-                    input.focus();
-                    input.select();
-                }
-                
-                if (e.key === "Escape") {
-                    input.blur();
-                    // Close any open modals
-                    const modals = $(".modal");
-                    modals.forEach(modal => modal.remove());
-                }
-            });
-        });
-    </script>
+<script src="app.js"></script> 
 </body>
 </html>
