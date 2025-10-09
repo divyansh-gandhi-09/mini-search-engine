@@ -53,26 +53,37 @@ bool DocumentManager::initialize() {
 
 std::string DocumentManager::extractFolderFromPath(const std::string& filepath) {
     fs::path p(filepath);
-    fs::path dataDir = fs::path("./data");
+    fs::path dataDir = fs::canonical("./data"); // Get absolute path
     
     try {
-        // Get relative path from data directory
-        fs::path relativePath = fs::relative(p, dataDir);
+        fs::path absPath = fs::canonical(p); // Resolve symlinks/..
         
-        // If file is in a subdirectory, use that as folder name
+        // Check if file is actually inside data directory
+        auto [it1, it2] = std::mismatch(dataDir.begin(), dataDir.end(), 
+                                        absPath.begin(), absPath.end());
+        if (it1 != dataDir.end()) {
+            return ""; // File is outside data directory
+        }
+        
+        fs::path relativePath = fs::relative(absPath, dataDir);
         if (relativePath.parent_path() != ".") {
             return relativePath.parent_path().string();
         }
     } catch (const std::exception& e) {
-        std::cout << "Warning: Could not extract folder from path " << filepath << ": " << e.what() << "\n";
+        std::cout << "Warning: Could not extract folder from path " << filepath 
+                  << ": " << e.what() << "\n";
     }
     
-    return ""; // No folder (root level)
+    return "";
 }
+
+// Optimized version of buildFreshIndex() method in document_manager.cpp
+
 
 void DocumentManager::buildFreshIndex() {
     std::cout << "Building fresh index...\n";
     
+    // Clear all data structures
     indexer.clear();
     autoComplete.clear();
     typoCorrector.clear();
@@ -89,6 +100,7 @@ void DocumentManager::buildFreshIndex() {
         std::cout << "Created ./data directory\n";
     }
 
+    // Collect all files first
     std::vector<fs::directory_entry> files;
     std::function<void(const fs::path&)> collectFiles = [&](const fs::path& dir) {
         try {
@@ -118,57 +130,118 @@ void DocumentManager::buildFreshIndex() {
     size_t totalChars = 0;
     std::unordered_set<std::string> folders;
 
-    for (size_t i = 0; i < files.size(); ++i) {
-        const auto& entry = files[i];
-        std::string path = entry.path().string();
+    // Pre-allocate maps for better performance
+    docIdToPath.reserve(files.size());
+    docIdToRel.reserve(files.size());
+    docIdToContent.reserve(files.size());
+    docIdToFolder.reserve(files.size());
+    docTokens.reserve(files.size());
+    docMeta.reserve(files.size());
+
+    // Process files in batches for better memory management
+    const size_t BATCH_SIZE = 100;
+    for (size_t batch_start = 0; batch_start < files.size(); batch_start += BATCH_SIZE) {
+        size_t batch_end = std::min(batch_start + BATCH_SIZE, files.size());
         
-        try {
-            std::string content = Parser::readFile(path);
-
-            if (content.empty()) {
-                std::cout << "Warning: Empty or unreadable file: " << path << "\n";
-                continue;
-            }
-
-            auto tokens = Parser::tokenize(content);
-            docTokens[docID] = std::move(tokens);
-            docIdToContent[docID] = std::move(content);
-
-            indexer.indexDocumentFromTokens(docID, docTokens[docID]);
-
-            for (const auto& w : docTokens[docID]) {
-                if (!w.empty()) {
-                    autoComplete.insert(w);
-                    typoCorrector.insert(w);
-                    vocabCount[w]++;
-                }
-            }
-
-            docIdToPath[docID] = path;
-            docIdToRel[docID] = entry.path().filename().string();
-            docMeta[docID] = std::to_string(fs::last_write_time(path).time_since_epoch().count());
+        // Process batch
+        for (size_t i = batch_start; i < batch_end; ++i) {
+            const auto& entry = files[i];
+            std::string path = entry.path().string();
             
-            // Extract folder from path
-            std::string folder = extractFolderFromPath(path);
-            docIdToFolder[docID] = folder;
-            if (!folder.empty()) folders.insert(folder);
+            try {
+                // Read file content
+                std::string content = Parser::readFile(path);
+                if (content.empty()) {
+                    std::cout << "Warning: Empty or unreadable file: " << path << "\n";
+                    continue;
+                }
 
-            totalChars += docIdToContent[docID].size();
-            ++docID;
+                // Tokenize content
+                auto tokens = Parser::tokenize(content);
+                if (tokens.empty()) continue;
 
-            // Progress reporting
-            if ((i + 1) % 50 == 0 || i == files.size() - 1) {
-                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - startTime).count();
-                std::cout << "Progress: " << (i + 1) << "/" << files.size() 
-                          << " files processed (" << std::fixed << std::setprecision(1) 
-                          << (100.0 * (i + 1) / files.size()) << "%) - "
-                          << elapsed << "ms elapsed\n";
+                // Store document data
+                docTokens[docID] = std::move(tokens);
+                docIdToContent[docID] = std::move(content);
+                docIdToPath[docID] = path;
+                docIdToRel[docID] = entry.path().filename().string();
+                
+                // Extract folder from path
+                std::string folder = extractFolderFromPath(path);
+                docIdToFolder[docID] = folder;
+                if (!folder.empty()) folders.insert(folder);
+
+                // Get file metadata
+                try {
+                    docMeta[docID] = std::to_string(fs::last_write_time(path).time_since_epoch().count());
+                } catch (const std::exception&) {
+                    docMeta[docID] = std::to_string(std::time(nullptr));
+                }
+
+                totalChars += docIdToContent[docID].size();
+                ++docID;
+
+            } catch (const std::exception& e) {
+                std::cout << "Error processing file " << path << ": " << e.what() << "\n";
             }
-        } catch (const std::exception& e) {
-            std::cout << "Error processing file " << path << ": " << e.what() << "\n";
+        }
+
+        // Progress reporting per batch
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - startTime).count();
+        
+        std::cout << "Progress: " << batch_end << "/" << files.size() 
+                  << " files processed (" << std::fixed << std::setprecision(1) 
+                  << (100.0 * batch_end / files.size()) << "%) - "
+                  << elapsed << "ms elapsed\n";
+    }
+
+    // Now build indexes from collected data - this is much faster than incremental updates
+    std::cout << "Building inverted index...\n";
+    auto index_start = std::chrono::steady_clock::now();
+    
+    // Build inverted index in one pass
+    std::unordered_map<std::string, std::unordered_map<int,int>> tempIndex;
+    std::unordered_set<std::string> allTerms;
+    
+    for (const auto& [docId, tokens] : docTokens) {
+        std::unordered_map<std::string, int> termFreq;
+        
+        // Count term frequencies in this document
+        for (const auto& token : tokens) {
+            if (!token.empty()) {
+                termFreq[token]++;
+                allTerms.insert(token);
+            }
+        }
+        
+        // Add to inverted index
+        for (const auto& [term, freq] : termFreq) {
+            tempIndex[term][docId] = freq;
+            vocabCount[term] += freq;
         }
     }
+    
+    // Set the index in one operation
+    indexer.setIndex(std::move(tempIndex));
+    
+    auto index_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - index_start).count();
+    std::cout << "Inverted index built in " << index_time << "ms\n";
+
+    // Build autocomplete and typo corrector
+    std::cout << "Building search structures...\n";
+    auto structures_start = std::chrono::steady_clock::now();
+    
+    // Insert all terms at once for better performance
+    for (const auto& term : allTerms) {
+        autoComplete.insert(term);
+        typoCorrector.insert(term);
+    }
+    
+    auto structures_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - structures_start).count();
+    std::cout << "Search structures built in " << structures_time << "ms\n";
 
     auto totalTime = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startTime).count();
@@ -188,10 +261,24 @@ void DocumentManager::buildFreshIndex() {
         std::cout << ")\n";
     }
     std::cout << "Time taken: " << totalTime << "ms\n";
+    std::cout << "Average: " << (totalTime / static_cast<double>(docID)) << "ms per document\n";
     std::cout << "================================\n\n";
     
+    // Save index and create search engine
     saveIndex();
     engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+    
+    // Force a small search to ensure everything is working
+    if (docID > 0) {
+        std::cout << "Performing index validation search...\n";
+        try {
+            Ranker ranker;
+            auto testResults = engine->search("test", ranker);
+            std::cout << "Index validation complete. Ready for queries.\n";
+        } catch (const std::exception& e) {
+            std::cout << "Warning: Index validation failed: " << e.what() << "\n";
+        }
+    }
 }
 
 void DocumentManager::updateExistingIndex() {
@@ -260,12 +347,15 @@ void DocumentManager::updateExistingIndex() {
                     indexer.removeDocument(id, docTokens[id]);
                     // Update vocabulary counts
                     for (const auto& w : docTokens[id]) {
-                        if (--vocabCount[w] <= 0) {
-                            vocabCount.erase(w);
-                            autoComplete.remove(w);
-                            typoCorrector.markDeleted(w);
-                        }
-                    }
+    auto it = vocabCount.find(w);
+    if (it != vocabCount.end()) {
+        if (--it->second <= 0) {
+            vocabCount.erase(it);
+            autoComplete.remove(w);
+            typoCorrector.markDeleted(w);
+        }
+    }
+}
                 }
 
                 docTokens[id] = tokens;
@@ -376,24 +466,54 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     }
 
     std::string sanitizedFolder = folder;
-    // Basic sanitization
+    
+    // Sanitize folder name if provided
     if (!sanitizedFolder.empty()) {
         // Remove dangerous characters
-        sanitizedFolder.erase(std::remove_if(sanitizedFolder.begin(), sanitizedFolder.end(), 
-            [](char c) { return c == '/' || c == '\\' || c == '.' || c == ':'; }), sanitizedFolder.end());
-        
+        sanitizedFolder.erase(
+            std::remove_if(sanitizedFolder.begin(), sanitizedFolder.end(), 
+                [](unsigned char c) { 
+                    return c == '/' || c == '\\' || c == '.' || c == ':' || 
+                           c == '<' || c == '>' || c == '|' || c == '*' || c == '?' ||
+                           c == '"' || c == '\0' || std::iscntrl(c);
+                }), 
+            sanitizedFolder.end()
+        );
+
+        // Check if empty after sanitization
         if (sanitizedFolder.empty()) {
             throw std::invalid_argument("Invalid folder name after sanitization");
+        }
+        
+        // Check for reserved Windows names
+        std::vector<std::string> reserved = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", 
+                                             "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", 
+                                             "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
+        
+        std::string upperFolder = sanitizedFolder;
+        std::transform(upperFolder.begin(), upperFolder.end(), upperFolder.begin(), ::toupper);
+        
+        for (const auto& res : reserved) {
+            if (upperFolder == res) {
+                throw std::invalid_argument("Folder name is a reserved system name: " + sanitizedFolder);
+            }
+        }
+        
+        // Limit length
+        if (sanitizedFolder.length() > 200) {
+            sanitizedFolder = sanitizedFolder.substr(0, 200);
         }
     }
     
     std::string folderPath = sanitizedFolder.empty() ? "./data/" : "./data/" + sanitizedFolder + "/";
     
     // Create folder directory if it doesn't exist
-    if (!sanitizedFolder.empty() && !fs::exists(folderPath)) {
+    if (!sanitizedFolder.empty()) {
         try {
-            fs::create_directories(folderPath);
-            std::cout << "Created folder: " << sanitizedFolder << "\n";
+            if (!fs::exists(folderPath)) {
+                fs::create_directories(folderPath);
+                std::cout << "Created folder: " << sanitizedFolder << "\n";
+            }
         } catch (const std::exception& e) {
             throw std::runtime_error("Failed to create folder: " + std::string(e.what()));
         }
@@ -406,6 +526,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         throw std::runtime_error("File already exists: " + filename);
     }
     
+    // Write file
     try {
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         if (!file) {
@@ -413,10 +534,15 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
         file << content;
         file.close();
+        
+        if (!fs::exists(path)) {
+            throw std::runtime_error("File was not created successfully");
+        }
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to write file: " + std::string(e.what()));
     }
 
+    // Index the document
     int newId = docID++;
     docIdToPath[newId] = path;
     docIdToRel[newId] = filename;
@@ -427,6 +553,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     docTokens[newId] = tokens;
     indexer.indexDocumentFromTokens(newId, tokens);
 
+    // Update autocomplete and typo correction
     for (const auto& w : tokens) {
         if (!w.empty()) {
             autoComplete.insert(w);
@@ -435,6 +562,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
     }
 
+    // Update file metadata
     try {
         docMeta[newId] = std::to_string(fs::last_write_time(path).time_since_epoch().count());
     } catch (const std::exception& e) {
@@ -442,6 +570,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         docMeta[newId] = std::to_string(std::time(nullptr));
     }
     
+    // Rebuild search engine and save
     engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
     saveIndex();
     

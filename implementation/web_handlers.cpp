@@ -96,9 +96,26 @@ void WebHandlers::handleStats(const httplib::Request&, httplib::Response& res) {
 
 void WebHandlers::handleFolders(const httplib::Request&, httplib::Response& res) {
     std::unordered_set<std::string> uniqueFolders;
+    
+    // Get folders from documents
     for (const auto& [id, folder] : docManager.getDocIdToFolder()) {
         if (!folder.empty()) uniqueFolders.insert(folder);
     }
+    
+    // Also scan data directory for empty folders
+    try {
+        if (fs::exists("./data")) {
+            for (const auto& entry : fs::directory_iterator("./data")) {
+                if (entry.is_directory()) {
+                    std::string folderName = entry.path().filename().string();
+                    uniqueFolders.insert(folderName);
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cout << "Warning: Could not scan data directory: " << e.what() << "\n";
+    }
+    
     json j = json::array();
     for (const auto& folder : uniqueFolders) {
         j.push_back(folder);
@@ -151,18 +168,56 @@ void WebHandlers::handleCreateFolder(const httplib::Request& req, httplib::Respo
         }).dump(), "application/json");
     }
 }
-
-void WebHandlers::handleSuggest(const httplib::Request& req, httplib::Response& res) {
-    auto prefix = req.get_param_value("prefix");
-    auto suggestions = docManager.getSuggestions(prefix);
-    res.set_content(json(suggestions).dump(), "application/json");
-}
-
 void WebHandlers::handleCorrect(const httplib::Request& req, httplib::Response& res) {
     auto word = req.get_param_value("word");
     int maxResults = req.has_param("max") ? std::stoi(req.get_param_value("max")) : 3;
     auto corrections = docManager.getCorrections(word, maxResults);
     res.set_content(json(corrections).dump(), "application/json");
+}
+// Added this new method to WebHandlers class in web_handlers.cpp
+
+void WebHandlers::handleSuggest(const httplib::Request& req, httplib::Response& res) {
+    auto prefix = req.get_param_value("prefix");
+    std::string folder = req.has_param("folder") ? req.get_param_value("folder") : "";
+    
+    if (prefix.empty()) {
+        res.set_content("[]", "application/json");
+        return;
+    }
+    
+    // Get all suggestions first
+    auto allSuggestions = docManager.getSuggestions(prefix);
+    
+    // If no folder filter is specified, return all suggestions
+    if (folder.empty()) {
+        res.set_content(json(allSuggestions).dump(), "application/json");
+        return;
+    }
+    
+    // Filter suggestions based on folder context
+    std::unordered_set<std::string> folderTerms;
+    
+    // Collect all terms from documents in the specified folder
+    for (const auto& [docId, docFolder] : docManager.getDocIdToFolder()) {
+        if (docFolder == folder && docManager.getDocTokens().count(docId)) {
+            const auto& tokens = docManager.getDocTokens().at(docId);
+            for (const auto& token : tokens) {
+                if (!token.empty()) {
+                    folderTerms.insert(token);
+                }
+            }
+        }
+    }
+    
+    // Filter suggestions to only include terms that exist in the folder
+    std::vector<std::string> filteredSuggestions;
+    for (const auto& suggestion : allSuggestions) {
+        if (folderTerms.count(suggestion)) {
+            filteredSuggestions.push_back(suggestion);
+        }
+    }
+    
+    res.set_content(json(filteredSuggestions).dump(), "application/json");
 }
 
 void WebHandlers::handleSearch(const httplib::Request& req, httplib::Response& res) {
@@ -174,6 +229,11 @@ void WebHandlers::handleSearch(const httplib::Request& req, httplib::Response& r
     }
 
     auto results = docManager.search(query);
+    std::cout << "Search for '" << query << "' returned " << results.size() << " results\n";
+    if (!results.empty()) {  
+    auto [id, score] = *results.begin();   // take the first (best) result
+    std::cout << "  Best matched Document " << id << ": score = " << score << "\n"; 
+    }
     json j = json::array();
     
     for (const auto& [id, score] : results) {
@@ -230,6 +290,8 @@ void WebHandlers::handleDocument(const httplib::Request& req, httplib::Response&
         {"size", docManager.getDocIdToContent().at(id).length()}
     }).dump(), "application/json");
 }
+// Fix for web_handlers.cpp - handleUpload function
+// This ensures custom filename and folder are properly received from FormData
 
 void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& res) {
     try {
@@ -239,11 +301,20 @@ void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& r
         if (req.is_multipart_form_data()) {
             auto file = req.get_file_value("file");
             if (!file.filename.empty()) {
-                filename = req.has_param("filename") && !req.get_param_value("filename").empty() 
-                          ? req.get_param_value("filename") 
-                          : file.filename;
+                // Get custom filename from form parameter OR use original filename
+                if (req.has_param("filename") && !req.get_param_value("filename").empty()) {
+                    filename = req.get_param_value("filename");
+                    std::cout << "Using custom filename: " << filename << "\n";
+                } else {
+                    filename = file.filename;
+                    std::cout << "Using original filename: " << filename << "\n";
+                }
                 
-                folder = req.has_param("folder") ? req.get_param_value("folder") : "";
+                // Get folder parameter
+                if (req.has_param("folder")) {
+                    folder = req.get_param_value("folder");
+                    std::cout << "Target folder: " << (folder.empty() ? "[root]" : folder) << "\n";
+                }
 
                 // Call Python extractor service
                 httplib::Client cli("127.0.0.1", 5000);
@@ -304,6 +375,9 @@ void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& r
                 content = body.value("content", "");
                 folder = body.value("folder", "");
                 
+                std::cout << "Manual upload - Filename: " << filename 
+                          << ", Folder: " << (folder.empty() ? "[root]" : folder) << "\n";
+                
                 if (filename.empty() || content.empty()) {
                     res.status = 400;
                     res.set_content(R"({"error":"Both filename and content are required","success":false})", "application/json");
@@ -321,6 +395,7 @@ void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& r
             }
         }
 
+        // Upload document with specified folder
         int newId = docManager.uploadDocument(filename, content, folder);
         
         // AUTO-UPDATE: Automatically update the index after upload
@@ -429,15 +504,56 @@ void WebHandlers::handleMoveToFolder(const httplib::Request& req, httplib::Respo
         }
         
         // Get current document info
-        std::string currentPath = docManager.getDocIdToPath().at(id);
         std::string filename = docManager.getDocIdToRel().at(id);
         std::string content = docManager.getDocIdToContent().at(id);
+        std::string oldFolder = docManager.getFolder(id);
         
-        // Delete old document
-        docManager.deleteDocument(id);
+        // Don't move if already in target folder
+        if (oldFolder == newFolder) {
+            res.set_content(json({
+                {"status", "unchanged"},
+                {"success", true},
+                {"id", id},
+                {"folder", newFolder},
+                {"message", "Document already in target folder"}
+            }).dump(), "application/json");
+            return;
+        }
         
-        // Upload to new location
-        int newId = docManager.uploadDocument(filename, content, newFolder);
+        // Create new document first (BEFORE deleting old one)
+        int newId;
+        try {
+            newId = docManager.uploadDocument(filename, content, newFolder);
+        } catch (const std::exception& e) {
+            res.status = 500;
+            res.set_content(json({
+                {"error", "Failed to create document in new location"},
+                {"details", e.what()},
+                {"success", false}
+            }).dump(), "application/json");
+            return;
+        }
+        
+        // Only delete old if upload succeeds
+        try {
+            docManager.deleteDocument(id);
+        } catch (const std::exception& e) {
+            // If delete fails, try to clean up the new document
+            std::cerr << "ERROR: Failed to delete old document after move, attempting rollback\n";
+            try {
+                docManager.deleteDocument(newId);
+            } catch (...) {
+                std::cerr << "ERROR: Rollback failed - manual cleanup may be needed\n";
+            }
+            
+            res.status = 500;
+            res.set_content(json({
+                {"error", "Failed to delete old document after move"},
+                {"details", e.what()},
+                {"success", false}
+            }).dump(), "application/json");
+            return;
+        }
         
         // AUTO-UPDATE: Update index after move
         std::cout << "Auto-updating index after folder move..." << std::endl;
@@ -448,7 +564,8 @@ void WebHandlers::handleMoveToFolder(const httplib::Request& req, httplib::Respo
             {"success", true},
             {"old_id", id},
             {"new_id", newId},
-            {"folder", newFolder},
+            {"old_folder", oldFolder},
+            {"new_folder", newFolder},
             {"message", "Document moved to folder successfully"}
         }).dump(), "application/json");
         

@@ -800,26 +800,60 @@
             });
         }
 
-        function showModal(doc, query) {
-            const modal = document.createElement("div");
-            modal.className = "modal";
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close">&times;</span>
-                    <h2>${doc.url || doc.filename}</h2>
-                    <div class="muted">Path: ${doc.path || ""}</div>
-                    ${doc.folder ? `<div class="muted">Folder: ${doc.folder}</div>` : ''}
-                    <div class="muted">Size: ${formatFileSize(doc.size || doc.content?.length || 0)}</div>
-                    <pre style="white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 400px; overflow-y: auto;">${highlightText(doc.content, query)}</pre>
-                </div>
-            `;
-            document.body.appendChild(modal);
+    function showModal(doc, query) {
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    
+    // Check if content is too large (over 100KB)
+    const isLargeFile = doc.content && doc.content.length > 100000;
+    const displayContent = isLargeFile ? 
+        doc.content.substring(0, 50000) + "\n\n... [Content truncated - file too large for display] ..." :
+        doc.content;
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>${doc.url || doc.filename}</h2>
+            <div class="muted">Path: ${doc.path || ""}</div>
+            ${doc.folder ? `<div class="muted">Folder: ${doc.folder}</div>` : ''}
+            <div class="muted">Size: ${formatFileSize(doc.size || doc.content?.length || 0)}</div>
+            ${isLargeFile ? '<div style="color: orange; margin: 1rem 0;">⚠️ Large file - showing first 50KB only</div>' : ''}
+            <div class="modal-actions">
+                <button onclick="copyToClipboard(\`${(displayContent || '').replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)">📋 Copy Visible Content</button>
+                <button onclick="downloadDocument('${doc.url || doc.filename}', \`${(doc.content || '').replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)">💾 Download Full File</button>
+            </div>
+            <pre style="white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 400px; overflow-y: auto;">${highlightText(displayContent || '', query)}</pre>
+        </div>
+    `;
+    document.body.appendChild(modal);
 
-            modal.querySelector(".close").onclick = () => modal.remove();
-            modal.addEventListener("click", (e) => {
-                if (e.target === modal) modal.remove();
-            });
-        }
+    modal.querySelector(".close").onclick = () => modal.remove();
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    
+    // Add copy and download functions if they don't exist
+    window.copyToClipboard = window.copyToClipboard || function(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification("Content copied to clipboard", "success");
+        }).catch(() => {
+            showNotification("Failed to copy content", "error");
+        });
+    };
+    
+    window.downloadDocument = window.downloadDocument || function(filename, content) {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        showNotification("Document downloaded", "success");
+    };
+}
 
         // Form handlers
         form.addEventListener("submit", (e) => {

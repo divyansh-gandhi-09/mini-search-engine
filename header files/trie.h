@@ -5,9 +5,10 @@ using namespace std;
 
 class Trie {
 private:
+    static constexpr int ALPHABET_SIZE = 256;
     struct Node {
         bool isWord = false;
-        Node* children[256] = {nullptr};  // full ASCII
+        Node* children[ALPHABET_SIZE] = {nullptr};  // full ASCII
     };
 
     Node* root;

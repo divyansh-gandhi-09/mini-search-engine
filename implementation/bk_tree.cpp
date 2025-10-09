@@ -39,19 +39,25 @@ int BKTree::levenshtein(const string& a, const string& b) {
     return dp[n][m];
 }
 void BKTree::insert(const std::string& word) {
-    if (word.empty()) return; // to ignore empties so just return 
+    if (word.empty()) return;
     if (!root) {
         root = new Node(word);
         return;
     }
     Node* curr = root;
     int dist = levenshtein(word, curr->word);
-    while (curr->children.count(dist)) {
-        if (curr->word == word) return; //  duplicates ke liye 
+    
+    while (true) {
+        if (curr->word == word) return; // Check before descending
+        
+        if (!curr->children.count(dist)) {
+            curr->children[dist] = new Node(word);
+            return;
+        }
+        
         curr = curr->children[dist];
         dist = levenshtein(word, curr->word);
     }
-    curr->children[dist] = new Node(word);
 }
 
 vector<string> BKTree::search(const string& target, int maxDistance) {

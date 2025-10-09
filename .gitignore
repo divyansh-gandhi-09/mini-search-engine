@@ -3,3 +3,6 @@ server.exe
 /.vscode/**
 data/*
 index.json
+# Python environment and dependencies
+Lib/
+Scripts/

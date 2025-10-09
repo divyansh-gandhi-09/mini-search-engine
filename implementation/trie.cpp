@@ -13,18 +13,24 @@ Trie::~Trie() {
 
 void Trie::freeNode(Node* node) {
     if (!node) return;
+    
     for (int i = 0; i < 256; i++) {
         if (node->children[i]) {
             freeNode(node->children[i]);
-            delete node->children[i];
             node->children[i] = nullptr;
         }
     }
+    delete node;
 }
 
 void Trie::clear() {
-    freeNode(root);
-    for (int i = 0; i < 256; i++) root->children[i] = nullptr;
+    // Free all children but NOT root itself
+    for (int i = 0; i < 256; i++) {
+        if (root->children[i]) {
+            freeNode(root->children[i]);
+            root->children[i] = nullptr;
+        }
+    }
     root->isWord = false;
 }
 
