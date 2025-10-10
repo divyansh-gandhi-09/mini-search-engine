@@ -241,9 +241,14 @@ void WebHandlers::handleSearch(const httplib::Request& req, httplib::Response& r
         if (!folder.empty() && docManager.getFolder(id) != folder) continue;
         
         // Skip if document no longer exists
-        if (!docManager.getDocIdToContent().count(id)) continue;
-        
-        std::string content = docManager.getDocIdToContent().at(id);
+        if (!docManager.getDocIdToContent().count(id)) {
+            continue;
+        }
+        std::string content = docManager.getDocumentContent(id);
+        if (content.empty()) {
+            std::cout << "DEBUG: Content is empty for doc " << id << "\n";
+            continue;
+        }
         std::string preview = createPreview(content, query);
         
         j.push_back({
@@ -286,12 +291,12 @@ void WebHandlers::handleDocument(const httplib::Request& req, httplib::Response&
         {"path", docManager.getDocIdToPath().at(id)},
         {"url", docManager.getDocIdToRel().at(id)},
         {"folder", docManager.getFolder(id)},
-        {"content", docManager.getDocIdToContent().at(id)},
+        {"content", docManager.getDocumentContent(id)},
         {"size", docManager.getDocIdToContent().at(id).length()}
     }).dump(), "application/json");
 }
 // Fix for web_handlers.cpp - handleUpload function
-// This ensures custom filename and folder are properly received from FormData
+// ensures custom filename and folder are properly received from FormData
 
 void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& res) {
     try {
@@ -398,9 +403,9 @@ void WebHandlers::handleUpload(const httplib::Request& req, httplib::Response& r
         // Upload document with specified folder
         int newId = docManager.uploadDocument(filename, content, folder);
         
-        // AUTO-UPDATE: Automatically update the index after upload
+         /*AUTO-UPDATE: Automatically update the index after upload
         std::cout << "Auto-updating index after upload..." << std::endl;
-        docManager.updateExistingIndex();
+        docManager.updateExistingIndex();*/
         
         json response_json = {
             {"status", "uploaded"},
@@ -441,9 +446,9 @@ void WebHandlers::handleEdit(const httplib::Request& req, httplib::Response& res
             return;
         }
         
-        // AUTO-UPDATE: Automatically update the index after edit
+        /* AUTO-UPDATE: Automatically update the index after edit
         std::cout << "Auto-updating index after edit..." << std::endl;
-        docManager.updateExistingIndex();
+        docManager.updateExistingIndex();*/
         
         res.set_content(json({
             {"status", "updated"}, 
@@ -470,9 +475,9 @@ void WebHandlers::handleDelete(const httplib::Request& req, httplib::Response& r
             return;
         }
         
-        // AUTO-UPDATE: Automatically update the index after delete
+        /* AUTO-UPDATE: Automatically update the index after delete
         std::cout << "Auto-updating index after delete..." << std::endl;
-        docManager.updateExistingIndex();
+        docManager.updateExistingIndex(); */
         
         res.set_content(json({
             {"status", "deleted"}, 
@@ -505,7 +510,7 @@ void WebHandlers::handleMoveToFolder(const httplib::Request& req, httplib::Respo
         
         // Get current document info
         std::string filename = docManager.getDocIdToRel().at(id);
-        std::string content = docManager.getDocIdToContent().at(id);
+        std::string content = docManager.getDocumentContent(id);
         std::string oldFolder = docManager.getFolder(id);
         
         // Don't move if already in target folder
@@ -555,9 +560,9 @@ void WebHandlers::handleMoveToFolder(const httplib::Request& req, httplib::Respo
             return;
         }
         
-        // AUTO-UPDATE: Update index after move
+        /* AUTO-UPDATE: Update index after move
         std::cout << "Auto-updating index after folder move..." << std::endl;
-        docManager.updateExistingIndex();
+        docManager.updateExistingIndex();*/
         
         res.set_content(json({
             {"status", "moved"},

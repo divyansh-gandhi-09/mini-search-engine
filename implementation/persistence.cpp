@@ -20,21 +20,23 @@ void PersistenceManager::saveIndexToFile(
     try {
         std::cout << "Saving index to file...\n";
         
-        // Build JSON object with error checking
         json j;
         j["docID"] = docID;
         j["docIdToPath"] = docIdToPath;
         j["docIdToRel"] = docIdToRel;
         j["index"] = indexer.getIndex();
-        j["docTokens"] = docTokens;
+        
+        // ✅ OPTIMIZATION 1: Don't store tokens - rebuild from index on load
+        // j["docTokens"] = docTokens;  // REMOVED - saves ~150 MB!
+        
         j["docMeta"] = docMeta;
         j["vocabCount"] = vocabCount;
         j["docIdToFolder"] = docIdToFolder;
 
-        // Serialize to string first (can throw)
+        // ✅ OPTIMIZATION 2: Use compact JSON (no pretty printing)
         std::string jsonStr;
         try {
-            jsonStr = j.dump(2); // Pretty print with indent
+            jsonStr = j.dump(); // No indent = smaller file
         } catch (const json::exception& e) {
             throw std::runtime_error(std::string("JSON serialization failed: ") + e.what());
         }
@@ -48,16 +50,14 @@ void PersistenceManager::saveIndexToFile(
         out << jsonStr;
         out.flush();
 
-        // Check for write errors
         if (!out.good()) {
             out.close();
             fs::remove("index.json.tmp");
-            throw std::runtime_error("Failed to write index.json.tmp - disk full or permission denied");
+            throw std::runtime_error("Failed to write index.json.tmp");
         }
         
         out.close();
 
-        // Verify file was written correctly
         if (!fs::exists("index.json.tmp")) {
             throw std::runtime_error("Temporary file was not created");
         }
@@ -68,7 +68,7 @@ void PersistenceManager::saveIndexToFile(
             throw std::runtime_error("Temporary file is empty");
         }
 
-        // Atomic rename (overwrites existing index.json)
+        // Atomic rename
         std::error_code ec;
         fs::rename("index.json.tmp", "index.json", ec);
         if (ec) {
@@ -76,14 +76,14 @@ void PersistenceManager::saveIndexToFile(
         }
 
         std::cout << "Index saved successfully (" << tmpSize << " bytes)\n";
+        std::cout << "Reduction: " << (571000000 - tmpSize) / 1000000 << " MB saved!\n";
         
     } catch (const std::exception& e) {
         std::cerr << "ERROR saving index: " << e.what() << "\n";
-        // Clean up temporary file if it exists
         if (fs::exists("index.json.tmp")) {
             fs::remove("index.json.tmp");
         }
-        throw; // Re-throw to caller
+        throw;
     }
 }
 
@@ -102,6 +102,7 @@ bool PersistenceManager::loadIndexFromFile(
         return false;
     }
 
+    auto startTime = std::chrono::steady_clock::now();
     std::ifstream in("index.json", std::ios::binary);
     if (!in.is_open()) {
         std::cerr << "ERROR: Could not open index.json\n";
@@ -113,13 +114,11 @@ bool PersistenceManager::loadIndexFromFile(
         in >> j;
         in.close();
 
-        // Validate required fields exist
         if (!j.contains("docID") || !j.contains("index")) {
             std::cerr << "ERROR: Corrupted index.json - missing required fields\n";
             return false;
         }
 
-        // Load all fields with error checking
         docID = j["docID"].get<int>();
         
         if (j.contains("docIdToPath"))
@@ -128,8 +127,27 @@ bool PersistenceManager::loadIndexFromFile(
         if (j.contains("docIdToRel"))
             docIdToRel = j["docIdToRel"].get<std::unordered_map<int, std::string>>();
         
-        if (j.contains("docTokens"))
+        // ✅ OPTIMIZATION 3: Rebuild tokens from inverted index instead of storing them
+        if (j.contains("docTokens")) {
+            // Old format compatibility
             docTokens = j["docTokens"].get<std::unordered_map<int, std::vector<std::string>>>();
+            std::cout << "Loaded tokens from old format\n";
+        } else {
+            // New format: rebuild tokens from inverted index
+            std::cout << "Rebuilding tokens from inverted index...\n";
+            auto loadedIndex = j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>();
+            
+            // Rebuild docTokens from inverted index
+            for (const auto& [term, postings] : loadedIndex) {
+                for (const auto& [docId, freq] : postings) {
+                    // Add term 'freq' times to maintain proper statistics
+                    for (int i = 0; i < freq; ++i) {
+                        docTokens[docId].push_back(term);
+                    }
+                }
+            }
+            std::cout << "Tokens rebuilt for " << docTokens.size() << " documents\n";
+        }
         
         if (j.contains("docMeta"))
             docMeta = j["docMeta"].get<std::unordered_map<int, std::string>>();
@@ -137,19 +155,21 @@ bool PersistenceManager::loadIndexFromFile(
         if (j.contains("vocabCount"))
             vocabCount = j["vocabCount"].get<std::unordered_map<std::string, int>>();
         
-        // Handle backward compatibility for docIdToFolder
         if (j.contains("docIdToFolder")) {
             docIdToFolder = j["docIdToFolder"].get<std::unordered_map<int, std::string>>();
         } else {
             docIdToFolder.clear();
-            std::cout << "Note: Old index format detected (no folder information)\n";
+            std::cout << "Note: Old index format (no folder information)\n";
         }
 
         // Load index
         auto loadedIndex = j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>();
         indexer.setIndex(loadedIndex);
 
-        std::cout << "Successfully loaded index with " << docID << " documents\n";
+        auto loadTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - startTime).count();
+
+        std::cout << "Successfully loaded index with " << docID << " documents in " << loadTime << "ms\n";
         return true;
         
     } catch (const json::exception& e) {

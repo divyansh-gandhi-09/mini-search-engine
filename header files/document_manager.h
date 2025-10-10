@@ -25,7 +25,6 @@ private:
     std::unique_ptr<SearchEngine> engine;
     int docID;
 
-    // Helper function to extract folder from file path
     std::string extractFolderFromPath(const std::string& filepath);
 
 public:
@@ -33,7 +32,7 @@ public:
     bool initialize();
     void buildFreshIndex();
     void updateExistingIndex();
-    void rebuildSearchStructures();
+    void rebuildSearchStructures(bool clearContent = true);  // ✅ Added parameter
 
     int uploadDocument(const std::string& filename, const std::string& content, const std::string& folder = "");
     bool editDocument(int id, const std::string& newContent);
@@ -51,7 +50,7 @@ public:
     const std::unordered_map<std::string, int>& getVocabCount() const { return vocabCount; }
     const std::unordered_map<int, std::string>& getDocIdToFolder() const { return docIdToFolder; }
     std::string getFolder(int docId) const;
-
+    std::string getDocumentContent(int docId);
     const Indexer& getIndexer() const { return indexer; }
     int getDocID() const { return docID; }
 

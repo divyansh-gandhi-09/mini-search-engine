@@ -27,7 +27,12 @@ bool DocumentManager::initialize() {
         updateFromPersistence(loadedDocIdToPath, loadedDocIdToRel,
                               loadedDocTokens, loadedDocMeta,
                               loadedVocabCount, loadedDocIdToFolder, loadedDocID);
-        rebuildSearchStructures();
+        
+        // ✅ Clear content for lazy loading since we're loading from disk
+        rebuildSearchStructures(true);
+        
+        // ✅ FIX: Create search engine after loading
+        engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
         
         // Show loaded index stats
         std::cout << "Loaded index with " << docID << " documents\n";
@@ -53,16 +58,25 @@ bool DocumentManager::initialize() {
 
 std::string DocumentManager::extractFolderFromPath(const std::string& filepath) {
     fs::path p(filepath);
-    fs::path dataDir = fs::canonical("./data"); // Get absolute path
+    
+    if (!fs::exists("./data")) {
+        return "";
+    }
     
     try {
-        fs::path absPath = fs::canonical(p); // Resolve symlinks/..
+        fs::path dataDir = fs::canonical("./data");
         
-        // Check if file is actually inside data directory
+        fs::path absPath;
+        if (fs::exists(p)) {
+            absPath = fs::canonical(p);
+        } else {
+            absPath = fs::absolute(p);
+        }
+        
         auto [it1, it2] = std::mismatch(dataDir.begin(), dataDir.end(), 
                                         absPath.begin(), absPath.end());
         if (it1 != dataDir.end()) {
-            return ""; // File is outside data directory
+            return "";
         }
         
         fs::path relativePath = fs::relative(absPath, dataDir);
@@ -76,9 +90,6 @@ std::string DocumentManager::extractFolderFromPath(const std::string& filepath) 
     
     return "";
 }
-
-// Optimized version of buildFreshIndex() method in document_manager.cpp
-
 
 void DocumentManager::buildFreshIndex() {
     std::cout << "Building fresh index...\n";
@@ -130,7 +141,6 @@ void DocumentManager::buildFreshIndex() {
     size_t totalChars = 0;
     std::unordered_set<std::string> folders;
 
-    // Pre-allocate maps for better performance
     docIdToPath.reserve(files.size());
     docIdToRel.reserve(files.size());
     docIdToContent.reserve(files.size());
@@ -138,40 +148,34 @@ void DocumentManager::buildFreshIndex() {
     docTokens.reserve(files.size());
     docMeta.reserve(files.size());
 
-    // Process files in batches for better memory management
     const size_t BATCH_SIZE = 100;
     for (size_t batch_start = 0; batch_start < files.size(); batch_start += BATCH_SIZE) {
         size_t batch_end = std::min(batch_start + BATCH_SIZE, files.size());
         
-        // Process batch
         for (size_t i = batch_start; i < batch_end; ++i) {
             const auto& entry = files[i];
             std::string path = entry.path().string();
             
             try {
-                // Read file content
                 std::string content = Parser::readFile(path);
                 if (content.empty()) {
                     std::cout << "Warning: Empty or unreadable file: " << path << "\n";
                     continue;
                 }
 
-                // Tokenize content
                 auto tokens = Parser::tokenize(content);
                 if (tokens.empty()) continue;
 
-                // Store document data
-                docTokens[docID] = std::move(tokens);
-                docIdToContent[docID] = std::move(content);
+                // ✅ KEEP content in memory during fresh build
+                docTokens[docID] = tokens;
+                docIdToContent[docID] = content;
                 docIdToPath[docID] = path;
                 docIdToRel[docID] = entry.path().filename().string();
                 
-                // Extract folder from path
                 std::string folder = extractFolderFromPath(path);
                 docIdToFolder[docID] = folder;
                 if (!folder.empty()) folders.insert(folder);
 
-                // Get file metadata
                 try {
                     docMeta[docID] = std::to_string(fs::last_write_time(path).time_since_epoch().count());
                 } catch (const std::exception&) {
@@ -186,7 +190,6 @@ void DocumentManager::buildFreshIndex() {
             }
         }
 
-        // Progress reporting per batch
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - startTime).count();
         
@@ -196,18 +199,16 @@ void DocumentManager::buildFreshIndex() {
                   << elapsed << "ms elapsed\n";
     }
 
-    // Now build indexes from collected data - this is much faster than incremental updates
+    // Build indexes from collected data
     std::cout << "Building inverted index...\n";
     auto index_start = std::chrono::steady_clock::now();
     
-    // Build inverted index in one pass
     std::unordered_map<std::string, std::unordered_map<int,int>> tempIndex;
     std::unordered_set<std::string> allTerms;
     
     for (const auto& [docId, tokens] : docTokens) {
         std::unordered_map<std::string, int> termFreq;
         
-        // Count term frequencies in this document
         for (const auto& token : tokens) {
             if (!token.empty()) {
                 termFreq[token]++;
@@ -215,14 +216,12 @@ void DocumentManager::buildFreshIndex() {
             }
         }
         
-        // Add to inverted index
         for (const auto& [term, freq] : termFreq) {
             tempIndex[term][docId] = freq;
             vocabCount[term] += freq;
         }
     }
     
-    // Set the index in one operation
     indexer.setIndex(std::move(tempIndex));
     
     auto index_time = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -233,7 +232,6 @@ void DocumentManager::buildFreshIndex() {
     std::cout << "Building search structures...\n";
     auto structures_start = std::chrono::steady_clock::now();
     
-    // Insert all terms at once for better performance
     for (const auto& term : allTerms) {
         autoComplete.insert(term);
         typoCorrector.insert(term);
@@ -262,15 +260,17 @@ void DocumentManager::buildFreshIndex() {
     }
     std::cout << "Time taken: " << totalTime << "ms\n";
     std::cout << "Average: " << (totalTime / static_cast<double>(docID)) << "ms per document\n";
+    std::cout << "Content in memory: " << docIdToContent.size() << " documents\n";
     std::cout << "================================\n\n";
     
-    // Save index and create search engine
+    // ✅ Content is already in memory from the build process - don't clear it!
+    // Search structures (autoComplete, typoCorrector) were already built above
+    // Just save index and create search engine
     saveIndex();
     engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
     
-    // Force a small search to ensure everything is working
+    std::cout << "Performing index validation search...\n";
     if (docID > 0) {
-        std::cout << "Performing index validation search...\n";
         try {
             Ranker ranker;
             auto testResults = engine->search("test", ranker);
@@ -278,6 +278,31 @@ void DocumentManager::buildFreshIndex() {
         } catch (const std::exception& e) {
             std::cout << "Warning: Index validation failed: " << e.what() << "\n";
         }
+    }
+}
+
+std::string DocumentManager::getDocumentContent(int docId) {
+    // Check if content is already in memory
+    auto it = docIdToContent.find(docId);
+    if (it != docIdToContent.end()) {
+        return it->second;
+    }
+    
+    // Lazy load from disk if not in memory
+    auto pathIt = docIdToPath.find(docId);
+    if (pathIt == docIdToPath.end()) {
+        return "";
+    }
+    
+    try {
+        std::string content = Parser::readFile(pathIt->second);
+        // Cache it for future use
+        docIdToContent[docId] = content;
+        return content;
+    } catch (const std::exception& e) {
+        std::cout << "Warning: Could not load content for doc " << docId 
+                  << ": " << e.what() << "\n";
+        return "";
     }
 }
 
@@ -306,12 +331,10 @@ void DocumentManager::updateExistingIndex() {
 
     int newFiles = 0, modifiedFiles = 0, deletedFiles = 0;
 
-    // Handle new and modified files
     for (const auto& file : currentFiles) {
         bool needsReindex = false;
         int id = -1;
 
-        // Find existing document
         for (auto& [docId, path] : docIdToPath) {
             if (path == file) {
                 id = docId;
@@ -332,7 +355,7 @@ void DocumentManager::updateExistingIndex() {
                 }
             } catch (const std::exception& e) {
                 std::cout << "Warning: Could not check modification time for " << file << "\n";
-                needsReindex = true; // Re-index if we can't determine modification time
+                needsReindex = true;
             }
         }
 
@@ -345,17 +368,16 @@ void DocumentManager::updateExistingIndex() {
 
                 if (docTokens.count(id)) {
                     indexer.removeDocument(id, docTokens[id]);
-                    // Update vocabulary counts
                     for (const auto& w : docTokens[id]) {
-    auto it = vocabCount.find(w);
-    if (it != vocabCount.end()) {
-        if (--it->second <= 0) {
-            vocabCount.erase(it);
-            autoComplete.remove(w);
-            typoCorrector.markDeleted(w);
-        }
-    }
-}
+                        auto it = vocabCount.find(w);
+                        if (it != vocabCount.end()) {
+                            if (--it->second <= 0) {
+                                vocabCount.erase(it);
+                                autoComplete.remove(w);
+                                typoCorrector.markDeleted(w);
+                            }
+                        }
+                    }
                 }
 
                 docTokens[id] = tokens;
@@ -366,7 +388,6 @@ void DocumentManager::updateExistingIndex() {
                 docIdToRel[id] = fs::path(file).filename().string();
                 docMeta[id] = std::to_string(fs::last_write_time(file).time_since_epoch().count());
                 
-                // Extract and set folder
                 std::string folder = extractFolderFromPath(file);
                 docIdToFolder[id] = folder;
 
@@ -383,7 +404,6 @@ void DocumentManager::updateExistingIndex() {
         }
     }
 
-    // Handle deleted files
     std::vector<int> toDelete;
     for (auto& [id, path] : docIdToPath) {
         if (!currentFiles.count(path)) {
@@ -425,25 +445,21 @@ void DocumentManager::updateExistingIndex() {
     }
 }
 
-void DocumentManager::rebuildSearchStructures() {
+void DocumentManager::rebuildSearchStructures(bool clearContent) {
     std::cout << "Rebuilding autocomplete + corrections from saved tokens...\n";
     
     autoComplete.clear();
     typoCorrector.clear();
-    docIdToContent.clear();
-
-    // Reload content from files
-    int successful = 0;
-    for (auto& [id, path] : docIdToPath) {
-        try {
-            docIdToContent[id] = Parser::readFile(path);
-            if (!docIdToContent[id].empty()) successful++;
-        } catch (const std::exception& e) {
-            std::cout << "Warning: Could not reload content from " << path << ": " << e.what() << "\n";
-        }
+    
+    // ✅ FIX: Only clear content when explicitly requested (e.g., loading from disk)
+    if (clearContent) {
+        docIdToContent.clear();
+        std::cout << "Content cleared - will be lazy-loaded on demand\n";
+    } else {
+        std::cout << "Keeping content in memory (" << docIdToContent.size() << " documents)\n";
     }
 
-    // Rebuild search structures
+    // Rebuild search structures from tokens
     std::unordered_set<std::string> vocab;
     for (auto& [id, tokens] : docTokens) {
         for (const auto& t : tokens) {
@@ -456,8 +472,7 @@ void DocumentManager::rebuildSearchStructures() {
         typoCorrector.insert(w);
     }
     
-    std::cout << "Rebuilt search structures: " << successful << "/" << docIdToPath.size() 
-              << " files reloaded, " << vocab.size() << " vocabulary terms\n";
+    std::cout << "Rebuilt search structures: " << vocab.size() << " vocabulary terms\n";
 }
 
 int DocumentManager::uploadDocument(const std::string& filename, const std::string& content, const std::string& folder) {
@@ -467,9 +482,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
 
     std::string sanitizedFolder = folder;
     
-    // Sanitize folder name if provided
     if (!sanitizedFolder.empty()) {
-        // Remove dangerous characters
         sanitizedFolder.erase(
             std::remove_if(sanitizedFolder.begin(), sanitizedFolder.end(), 
                 [](unsigned char c) { 
@@ -480,12 +493,10 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
             sanitizedFolder.end()
         );
 
-        // Check if empty after sanitization
         if (sanitizedFolder.empty()) {
             throw std::invalid_argument("Invalid folder name after sanitization");
         }
         
-        // Check for reserved Windows names
         std::vector<std::string> reserved = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", 
                                              "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", 
                                              "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
@@ -499,7 +510,6 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
             }
         }
         
-        // Limit length
         if (sanitizedFolder.length() > 200) {
             sanitizedFolder = sanitizedFolder.substr(0, 200);
         }
@@ -507,7 +517,6 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     
     std::string folderPath = sanitizedFolder.empty() ? "./data/" : "./data/" + sanitizedFolder + "/";
     
-    // Create folder directory if it doesn't exist
     if (!sanitizedFolder.empty()) {
         try {
             if (!fs::exists(folderPath)) {
@@ -521,12 +530,10 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     
     std::string path = folderPath + filename;
     
-    // Check if file already exists
     if (fs::exists(path)) {
         throw std::runtime_error("File already exists: " + filename);
     }
     
-    // Write file
     try {
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         if (!file) {
@@ -542,7 +549,6 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         throw std::runtime_error("Failed to write file: " + std::string(e.what()));
     }
 
-    // Index the document
     int newId = docID++;
     docIdToPath[newId] = path;
     docIdToRel[newId] = filename;
@@ -553,7 +559,6 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     docTokens[newId] = tokens;
     indexer.indexDocumentFromTokens(newId, tokens);
 
-    // Update autocomplete and typo correction
     for (const auto& w : tokens) {
         if (!w.empty()) {
             autoComplete.insert(w);
@@ -562,7 +567,6 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
     }
 
-    // Update file metadata
     try {
         docMeta[newId] = std::to_string(fs::last_write_time(path).time_since_epoch().count());
     } catch (const std::exception& e) {
@@ -570,7 +574,6 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         docMeta[newId] = std::to_string(std::time(nullptr));
     }
     
-    // Rebuild search engine and save
     engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
     saveIndex();
     
@@ -585,16 +588,13 @@ bool DocumentManager::editDocument(int id, const std::string& newContent) {
     if (newContent.empty()) return false;
 
     try {
-        // Write to file
         std::ofstream file(docIdToPath[id], std::ios::binary | std::ios::trunc);
         if (!file) return false;
         file << newContent;
         file.close();
 
-        // Remove old document from index
         if (docTokens.count(id)) {
             indexer.removeDocument(id, docTokens[id]);
-            // Update vocabulary counts
             for (const auto& w : docTokens[id]) {
                 if (--vocabCount[w] <= 0) {
                     vocabCount.erase(w);
@@ -604,7 +604,6 @@ bool DocumentManager::editDocument(int id, const std::string& newContent) {
             }
         }
 
-        // Add new document
         auto tokens = Parser::tokenize(newContent);
         docTokens[id] = std::move(tokens);
         docIdToContent[id] = newContent;
@@ -619,7 +618,6 @@ bool DocumentManager::editDocument(int id, const std::string& newContent) {
         }
 
         docMeta[id] = std::to_string(fs::last_write_time(docIdToPath[id]).time_since_epoch().count());
-        // Note: folder is preserved (not changed during edit)
         
         engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
         saveIndex();
@@ -636,14 +634,12 @@ bool DocumentManager::deleteDocument(int id) {
     if (!docIdToPath.count(id)) return false;
 
     try {
-        // Delete file from disk
         if (fs::exists(docIdToPath[id])) {
             if (!fs::remove(docIdToPath[id])) {
                 std::cout << "Warning: Could not delete file from disk: " << docIdToPath[id] << "\n";
             }
         }
 
-        // Remove from index
         if (docTokens.count(id)) {
             indexer.removeDocument(id, docTokens[id]);
             for (auto& w : docTokens[id]) {
