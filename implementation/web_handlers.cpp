@@ -86,10 +86,19 @@ void WebHandlers::handleStats(const httplib::Request&, httplib::Response& res) {
     
     // Size stats
     size_t totalSize = 0;
-    for (const auto& [id, content] : docManager.getDocIdToContent()) {
-        totalSize += content.size();
+    size_t filesChecked = 0;
+for (const auto& [id, path] : docManager.getDocIdToPath()) {
+    try {
+        if (fs::exists(path)) {
+            totalSize += fs::file_size(path);
+            filesChecked++;
+        }
+    } catch (const std::exception& e) {
+        std::cout << "Warning: Could not get size for " << path << "\n";
     }
-    stats["total_content_size"] = totalSize;
+}
+stats["total_content_size"] = totalSize;
+stats["content_in_memory"] = docManager.getDocIdToContent().size();
     
     res.set_content(stats.dump(), "application/json");
 }
@@ -241,9 +250,9 @@ void WebHandlers::handleSearch(const httplib::Request& req, httplib::Response& r
         if (!folder.empty() && docManager.getFolder(id) != folder) continue;
         
         // Skip if document no longer exists
-        if (!docManager.getDocIdToContent().count(id)) {
+        /*if (!docManager.getDocIdToContent().count(id)) {
             continue;
-        }
+        }*/
         std::string content = docManager.getDocumentContent(id);
         if (content.empty()) {
             std::cout << "DEBUG: Content is empty for doc " << id << "\n";
@@ -602,9 +611,10 @@ void WebHandlers::handleDocuments(const httplib::Request& req, httplib::Response
             continue;
         }
         
-        std::string content = docManager.getDocIdToContent().count(id)
-            ? docManager.getDocIdToContent().at(id) : "";
-        std::string preview = content.substr(0, std::min<size_t>(200, content.size()));
+        // std::string content = docManager.getDocIdToContent().count(id)
+        //   ? docManager.getDocIdToContent().at(id) : "";
+         std::string content = docManager.getDocumentContent(id);
+         std::string preview = content.substr(0, std::min<size_t>(200, content.size()));
         
         j.push_back({
             {"id", id},

@@ -16,7 +16,7 @@ void Indexer::indexDocumentFromTokens(int docID, const std::vector<std::string>&
     }
 }
 
-std::unordered_map<std::string, std::unordered_map<int,int>> Indexer::getIndex() const {
+const std::unordered_map<std::string, std::unordered_map<int,int>>& Indexer::getIndex() const {
     return invertedIndex;
 }
 

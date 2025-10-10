@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include "../third_party/json.hpp"
-
+#include <iomanip>
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
@@ -76,7 +76,8 @@ void PersistenceManager::saveIndexToFile(
         }
 
         std::cout << "Index saved successfully (" << tmpSize << " bytes)\n";
-        std::cout << "Reduction: " << (571000000 - tmpSize) / 1000000 << " MB saved!\n";
+        std::cout << "Index file size: " << std::fixed << std::setprecision(2) 
+          << (tmpSize / 1024.0 / 1024.0) << " MB\n";
         
     } catch (const std::exception& e) {
         std::cerr << "ERROR saving index: " << e.what() << "\n";

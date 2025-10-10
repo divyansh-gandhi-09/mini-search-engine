@@ -11,7 +11,7 @@ public:
                  int totalDocs);
     std::vector<std::pair<int, double>> search(const std::string& query, const Ranker& ranker) ;
 private:
-    const std::unordered_map<std::string, std::unordered_map<int,int>> invertedIndex; // maybe Reference
+    const std::unordered_map<std::string, std::unordered_map<int,int>>& invertedIndex; // maybe Reference
     int totalDocuments;
     std::unordered_set<int> andOperation(const std::vector<std::string>& terms) ;
     std::unordered_set<int> orOperation(const std::vector<std::string>& terms);
