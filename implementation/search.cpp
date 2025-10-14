@@ -3,24 +3,21 @@
 #include <unordered_set>
 #include <algorithm>
 #include <iostream>
-#include <cctype>
 
 SearchEngine::SearchEngine(
     const std::unordered_map<std::string, std::unordered_map<int,int>>& index,
     int totalDocs)
     : invertedIndex(index), totalDocuments(totalDocs) {}
 
-// ---------------- Search ----------------
 std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query, const Ranker& ranker) {
-    // Parser::tokenize already converts to lowercase!
+    // Parser::tokenize already converts to lowercase
     std::vector<std::string> terms = Parser::tokenize(query);
-    std::unordered_map<int,double> scores;
     
-    // Check if query contains "AND"
     bool isAndQuery = false;
     std::vector<std::string> actualTerms;
+    actualTerms.reserve(terms.size());
     
-    // NO TOLOWER HERE - Parser already did it!
+    // Separate "and" keyword from actual search terms
     for (const auto& term : terms) {
         if (term == "and") {
             isAndQuery = true;
@@ -29,8 +26,10 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         }
     }
 
+    std::unordered_map<int, double> scores;
+    
     if (isAndQuery && actualTerms.size() >= 2) {
-        // AND operation - only documents containing ALL terms
+        // ✅ OPTIMIZED: Efficient AND operation with early termination
         std::unordered_set<int> validDocs = andOperation(actualTerms);
         
         if (validDocs.empty()) {
@@ -39,6 +38,9 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         }
         
         std::cout << "AND query found " << validDocs.size() << " documents with all terms\n";
+        
+        // Pre-allocate scores map
+        scores.reserve(validDocs.size());
         
         // Calculate scores only for documents that contain ALL terms
         for (const auto& term : actualTerms) {
@@ -56,6 +58,16 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
             }
         }
     } else {
+        // ✅ OPTIMIZED: Pre-allocate based on estimated result size
+        size_t estimatedResults = 0;
+        for (const auto& term : actualTerms) {
+            auto it = invertedIndex.find(term);
+            if (it != invertedIndex.end()) {
+                estimatedResults += it->second.size();
+            }
+        }
+        scores.reserve(std::min<size_t>(estimatedResults, 10000));
+        
         // Regular OR operation - documents containing ANY term
         for (const auto& term : actualTerms) {
             auto it = invertedIndex.find(term);
@@ -74,70 +86,109 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         }
     }
 
-    std::vector<std::pair<int,double>> results(scores.begin(), scores.end());
-    std::sort(results.begin(), results.end(),
-              [](const auto& a, const auto& b){ return a.second > b.second; });
+    // ✅ OPTIMIZED: Reserve result vector
+    std::vector<std::pair<int,double>> results;
+    results.reserve(scores.size());
+    results.assign(scores.begin(), scores.end());
+    
+    // ✅ Partial sort for top-K results (if you only need top 100)
+    if (results.size() > 100) {
+        std::partial_sort(results.begin(), results.begin() + 100, results.end(),
+                          [](const auto& a, const auto& b){ return a.second > b.second; });
+        results.resize(100);
+    } else {
+        std::sort(results.begin(), results.end(),
+                  [](const auto& a, const auto& b){ return a.second > b.second; });
+    }
     
     return results;
 }
 
-// ---------------- AND operation ----------------
+// ✅ OPTIMIZED: Efficient AND operation with smallest-set-first strategy
 std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string>& terms) {
     if (terms.empty()) return {};
     
-    // Start with documents containing first term
-    auto it = invertedIndex.find(terms[0]);
-    if (it == invertedIndex.end()) {
-        std::cout << "First AND term '" << terms[0] << "' not found\n";
-        return {};
+    // ✅ Find the term with smallest posting list (optimization)
+    size_t smallestIdx = 0;
+    size_t smallestSize = SIZE_MAX;
+    
+    for (size_t i = 0; i < terms.size(); ++i) {
+        auto it = invertedIndex.find(terms[i]);
+        if (it == invertedIndex.end()) {
+            std::cout << "AND term '" << terms[i] << "' not found - returning empty set\n";
+            return {}; // Term not found = no results
+        }
+        if (it->second.size() < smallestSize) {
+            smallestSize = it->second.size();
+            smallestIdx = i;
+        }
     }
-
+    
+    // Start with smallest set for efficiency
+    auto startIt = invertedIndex.find(terms[smallestIdx]);
     std::unordered_set<int> resultSet;
-    for (const auto& [docId, freq] : it->second) {
+    resultSet.reserve(startIt->second.size());
+    
+    for (const auto& [docId, _] : startIt->second) {
         resultSet.insert(docId);
     }
-
-    // Intersect with documents containing each subsequent term
-    for (size_t i = 1; i < terms.size(); ++i) {
-        auto it2 = invertedIndex.find(terms[i]);
-        if (it2 == invertedIndex.end()) {
-            std::cout << "AND term '" << terms[i] << "' not found - returning empty set\n";
-            return {};
+    
+    // ✅ OPTIMIZED: Check containment efficiently
+    for (size_t i = 0; i < terms.size(); ++i) {
+        if (i == smallestIdx) continue; // Skip the one we started with
+        
+        auto it = invertedIndex.find(terms[i]);
+        if (it == invertedIndex.end()) {
+            return {}; // Early exit - no results possible
         }
         
+        // Build hash set for O(1) lookup
         std::unordered_set<int> currentSet;
-        for (const auto& [docId, freq] : it2->second) {
+        currentSet.reserve(it->second.size());
+        for (const auto& [docId, _] : it->second) {
             currentSet.insert(docId);
         }
-
-        // Keep only documents in both sets
-        std::unordered_set<int> newSet;
+        
+        // Keep only documents in intersection
+        std::unordered_set<int> intersection;
+        intersection.reserve(std::min(resultSet.size(), currentSet.size()));
+        
         for (int docId : resultSet) {
             if (currentSet.count(docId)) {
-                newSet.insert(docId);
+                intersection.insert(docId);
             }
         }
         
-        resultSet = std::move(newSet);
+        resultSet = std::move(intersection);
         
         if (resultSet.empty()) {
             std::cout << "Intersection became empty after term '" << terms[i] << "'\n";
-            break;
+            return {}; // Early exit if empty
         }
     }
-
+    
     return resultSet;
 }
 
-// ---------------- OR operation ----------------
+// ✅ OPTIMIZED: Union operation with reserves
 std::unordered_set<int> SearchEngine::orOperation(const std::vector<std::string>& terms) {
     std::unordered_set<int> resultSet;
+    
+    // Estimate size for reserve
+    size_t estimatedSize = 0;
+    for (const auto& term : terms) {
+        auto it = invertedIndex.find(term);
+        if (it != invertedIndex.end()) {
+            estimatedSize += it->second.size();
+        }
+    }
+    resultSet.reserve(std::min<size_t>(estimatedSize, 100000));
     
     for (const std::string& term : terms) {
         auto it = invertedIndex.find(term);
         if (it == invertedIndex.end()) continue;
         
-        for (const auto& [docId, freq] : it->second) {
+        for (const auto& [docId, _] : it->second) {
             resultSet.insert(docId);
         }
     }

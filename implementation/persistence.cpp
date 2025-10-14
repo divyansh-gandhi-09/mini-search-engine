@@ -26,22 +26,21 @@ void PersistenceManager::saveIndexToFile(
         j["docIdToRel"] = docIdToRel;
         j["index"] = indexer.getIndex();
         
-        // ✅ OPTIMIZATION 1: Don't store tokens - rebuild from index on load
-        // j["docTokens"] = docTokens;  // REMOVED - saves ~150 MB!
+        // ✅ SAVE TOKENS - Don't rebuild them on load!
+        j["docTokens"] = docTokens;
         
         j["docMeta"] = docMeta;
         j["vocabCount"] = vocabCount;
         j["docIdToFolder"] = docIdToFolder;
 
-        // ✅ OPTIMIZATION 2: Use compact JSON (no pretty printing)
+        // Compact JSON
         std::string jsonStr;
         try {
-            jsonStr = j.dump(); // No indent = smaller file
+            jsonStr = j.dump();
         } catch (const json::exception& e) {
             throw std::runtime_error(std::string("JSON serialization failed: ") + e.what());
         }
 
-        // Write to temporary file
         std::ofstream out("index.json.tmp", std::ios::trunc | std::ios::binary);
         if (!out) {
             throw std::runtime_error("Cannot create index.json.tmp");
@@ -68,7 +67,6 @@ void PersistenceManager::saveIndexToFile(
             throw std::runtime_error("Temporary file is empty");
         }
 
-        // Atomic rename
         std::error_code ec;
         fs::rename("index.json.tmp", "index.json", ec);
         if (ec) {
@@ -120,7 +118,16 @@ bool PersistenceManager::loadIndexFromFile(
             return false;
         }
 
+        // ✅ OPTIMIZED: Load directly without expensive rebuilds
         docID = j["docID"].get<int>();
+        
+        // Pre-reserve hash maps for better performance
+        size_t expectedDocs = static_cast<size_t>(docID);
+        docIdToPath.reserve(expectedDocs);
+        docIdToRel.reserve(expectedDocs);
+        docTokens.reserve(expectedDocs);
+        docMeta.reserve(expectedDocs);
+        docIdToFolder.reserve(expectedDocs);
         
         if (j.contains("docIdToPath"))
             docIdToPath = j["docIdToPath"].get<std::unordered_map<int, std::string>>();
@@ -128,26 +135,39 @@ bool PersistenceManager::loadIndexFromFile(
         if (j.contains("docIdToRel"))
             docIdToRel = j["docIdToRel"].get<std::unordered_map<int, std::string>>();
         
-        // ✅ OPTIMIZATION 3: Rebuild tokens from inverted index instead of storing them
+        // ✅ CRITICAL FIX: Just load tokens directly - NO REBUILD!
         if (j.contains("docTokens")) {
-            // Old format compatibility
             docTokens = j["docTokens"].get<std::unordered_map<int, std::vector<std::string>>>();
-            std::cout << "Loaded tokens from old format\n";
+            std::cout << "Loaded tokens for " << docTokens.size() << " documents\n";
         } else {
-            // New format: rebuild tokens from inverted index
-            std::cout << "Rebuilding tokens from inverted index...\n";
+            // ✅ OPTIMIZED FALLBACK: If old format, rebuild efficiently
+            std::cout << "Rebuilding tokens from inverted index (one-time migration)...\n";
             auto loadedIndex = j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>();
             
-            // Rebuild docTokens from inverted index
+            // First pass: count total tokens per doc for proper reserve
+            std::unordered_map<int, size_t> docTokenCounts;
             for (const auto& [term, postings] : loadedIndex) {
                 for (const auto& [docId, freq] : postings) {
-                    // Add term 'freq' times to maintain proper statistics
+                    docTokenCounts[docId] += freq;
+                }
+            }
+            
+            // Pre-allocate all vectors
+            for (const auto& [docId, count] : docTokenCounts) {
+                docTokens[docId].reserve(count);
+            }
+            
+            // Second pass: fill vectors (now no reallocation!)
+            for (const auto& [term, postings] : loadedIndex) {
+                for (const auto& [docId, freq] : postings) {
+                    auto& tokens = docTokens[docId];
                     for (int i = 0; i < freq; ++i) {
-                        docTokens[docId].push_back(term);
+                        tokens.push_back(term);
                     }
                 }
             }
             std::cout << "Tokens rebuilt for " << docTokens.size() << " documents\n";
+            std::cout << "⚠️  Recommend re-saving index to avoid rebuild next time\n";
         }
         
         if (j.contains("docMeta"))
@@ -165,12 +185,14 @@ bool PersistenceManager::loadIndexFromFile(
 
         // Load index
         auto loadedIndex = j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>();
-        indexer.setIndex(loadedIndex);
+        indexer.setIndex(std::move(loadedIndex));  // ✅ Use move semantics
 
         auto loadTime = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - startTime).count();
 
-        std::cout << "Successfully loaded index with " << docID << " documents in " << loadTime << "ms\n";
+        std::cout << "Successfully loaded index with " << docID << " documents in " 
+                  << loadTime << "ms (" << std::fixed << std::setprecision(2) 
+                  << (loadTime / static_cast<double>(docID)) << "ms per doc)\n";
         return true;
         
     } catch (const json::exception& e) {
