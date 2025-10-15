@@ -135,7 +135,7 @@ void DocumentManager::buildFreshIndex() {
     size_t totalChars = 0;
     std::unordered_set<std::string> folders;
 
-    // ✅ Pre-allocate all maps
+    //  Pre-allocate all maps
     docIdToPath.reserve(files.size());
     docIdToRel.reserve(files.size());
     docIdToContent.reserve(files.size());
@@ -199,7 +199,7 @@ void DocumentManager::buildFreshIndex() {
     std::unordered_map<std::string, std::unordered_map<int,int>> tempIndex;
     std::unordered_set<std::string> allTerms;
     
-    // ✅ Estimate vocabulary size for reserve
+    //  Estimate vocabulary size for reserve
     size_t estimatedVocab = 0;
     for (const auto& [docId, tokens] : docTokens) {
         estimatedVocab += tokens.size();
@@ -209,7 +209,7 @@ void DocumentManager::buildFreshIndex() {
     
     for (const auto& [docId, tokens] : docTokens) {
         std::unordered_map<std::string, int> termFreq;
-        termFreq.reserve(tokens.size() / 2); // ✅ Reserve
+        termFreq.reserve(tokens.size() / 2); //  Reserve
         
         for (const auto& token : tokens) {
             if (!token.empty()) {
@@ -360,7 +360,7 @@ void DocumentManager::updateExistingIndex() {
                 
                 auto tokens = Parser::tokenize(content);
 
-                // ✅ OPTIMIZED: Remove old tokens efficiently
+                //  OPTIMIZED: Remove old tokens efficiently
                 if (docTokens.count(id)) {
                     indexer.removeDocument(id, docTokens[id]);
                     for (const auto& w : docTokens[id]) {
@@ -454,7 +454,7 @@ void DocumentManager::rebuildSearchStructures(bool clearContent) {
     }
 
     std::unordered_set<std::string> vocab;
-    vocab.reserve(vocabCount.size()); // ✅ Reserve based on known vocab
+    vocab.reserve(vocabCount.size()); //  Reserve based on known vocab
     
     for (auto& [id, tokens] : docTokens) {
         for (const auto& t : tokens) {
@@ -578,7 +578,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     return newId;
 }
 
-// ✅ OPTIMIZED: Use move semantics for tokens
+//  OPTIMIZED: Use move semantics for tokens
 bool DocumentManager::editDocument(int id, const std::string& newContent) {
     if (!docIdToPath.count(id)) return false;
     if (newContent.empty()) return false;

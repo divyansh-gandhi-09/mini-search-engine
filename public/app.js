@@ -582,7 +582,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         showNotification(
-          `✅ "${data.filename}" uploaded successfully!${data.folder ? ` to folder "${data.folder}"` : ""} Document ID: ${data.id}`,
+          ` "${data.filename}" uploaded successfully!${data.folder ? ` to folder "${data.folder}"` : ""} Document ID: ${data.id}`,
           "success"
         );
 
@@ -613,7 +613,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "Upload failed");
 
-        showNotification(`✅ "${data.filename}" created successfully!${data.folder ? ` in folder "${data.folder}"` : ""} Document ID: ${data.id}`, "success");
+        showNotification(` "${data.filename}" created successfully!${data.folder ? ` in folder "${data.folder}"` : ""} Document ID: ${data.id}`, "success");
 
         $("#upload-form").reset();
         await Promise.all([loadFolders(), loadStats()]);

@@ -29,7 +29,7 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
     std::unordered_map<int, double> scores;
     
     if (isAndQuery && actualTerms.size() >= 2) {
-        // ✅ OPTIMIZED: Efficient AND operation with early termination
+        //  OPTIMIZED: Efficient AND operation with early termination
         std::unordered_set<int> validDocs = andOperation(actualTerms);
         
         if (validDocs.empty()) {
@@ -58,7 +58,7 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
             }
         }
     } else {
-        // ✅ OPTIMIZED: Pre-allocate based on estimated result size
+        //  OPTIMIZED: Pre-allocate based on estimated result size
         size_t estimatedResults = 0;
         for (const auto& term : actualTerms) {
             auto it = invertedIndex.find(term);
@@ -86,12 +86,12 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         }
     }
 
-    // ✅ OPTIMIZED: Reserve result vector
+    //  OPTIMIZED: Reserve result vector
     std::vector<std::pair<int,double>> results;
     results.reserve(scores.size());
     results.assign(scores.begin(), scores.end());
     
-    // ✅ Partial sort for top-K results (if you only need top 100)
+    //  Partial sort for top-K results (if you only need top 100)
     if (results.size() > 100) {
         std::partial_sort(results.begin(), results.begin() + 100, results.end(),
                           [](const auto& a, const auto& b){ return a.second > b.second; });
@@ -104,11 +104,11 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
     return results;
 }
 
-// ✅ OPTIMIZED: Efficient AND operation with smallest-set-first strategy
+//  OPTIMIZED: Efficient AND operation with smallest-set-first strategy
 std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string>& terms) {
     if (terms.empty()) return {};
     
-    // ✅ Find the term with smallest posting list (optimization)
+    //  Find the term with smallest posting list (optimization)
     size_t smallestIdx = 0;
     size_t smallestSize = SIZE_MAX;
     
@@ -133,7 +133,7 @@ std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string
         resultSet.insert(docId);
     }
     
-    // ✅ OPTIMIZED: Check containment efficiently
+    //  OPTIMIZED: Check containment efficiently
     for (size_t i = 0; i < terms.size(); ++i) {
         if (i == smallestIdx) continue; // Skip the one we started with
         
@@ -170,7 +170,7 @@ std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string
     return resultSet;
 }
 
-// ✅ OPTIMIZED: Union operation with reserves
+//  OPTIMIZED: Union operation with reserves
 std::unordered_set<int> SearchEngine::orOperation(const std::vector<std::string>& terms) {
     std::unordered_set<int> resultSet;
     

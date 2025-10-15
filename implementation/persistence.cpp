@@ -26,7 +26,7 @@ void PersistenceManager::saveIndexToFile(
         j["docIdToRel"] = docIdToRel;
         j["index"] = indexer.getIndex();
         
-        // ✅ SAVE TOKENS - Don't rebuild them on load!
+        //  SAVE TOKENS - Don't rebuild them on load!
         j["docTokens"] = docTokens;
         
         j["docMeta"] = docMeta;
@@ -118,7 +118,7 @@ bool PersistenceManager::loadIndexFromFile(
             return false;
         }
 
-        // ✅ OPTIMIZED: Load directly without expensive rebuilds
+        //  OPTIMIZED: Load directly without expensive rebuilds
         docID = j["docID"].get<int>();
         
         // Pre-reserve hash maps for better performance
@@ -135,12 +135,12 @@ bool PersistenceManager::loadIndexFromFile(
         if (j.contains("docIdToRel"))
             docIdToRel = j["docIdToRel"].get<std::unordered_map<int, std::string>>();
         
-        // ✅ CRITICAL FIX: Just load tokens directly - NO REBUILD!
+        //  CRITICAL FIX: Just load tokens directly - NO REBUILD!
         if (j.contains("docTokens")) {
             docTokens = j["docTokens"].get<std::unordered_map<int, std::vector<std::string>>>();
             std::cout << "Loaded tokens for " << docTokens.size() << " documents\n";
         } else {
-            // ✅ OPTIMIZED FALLBACK: If old format, rebuild efficiently
+            //  OPTIMIZED FALLBACK: If old format, rebuild efficiently
             std::cout << "Rebuilding tokens from inverted index (one-time migration)...\n";
             auto loadedIndex = j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>();
             
@@ -185,7 +185,7 @@ bool PersistenceManager::loadIndexFromFile(
 
         // Load index
         auto loadedIndex = j["index"].get<std::unordered_map<std::string, std::unordered_map<int, int>>>();
-        indexer.setIndex(std::move(loadedIndex));  // ✅ Use move semantics
+        indexer.setIndex(std::move(loadedIndex));  //  Use move semantics
 
         auto loadTime = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - startTime).count();

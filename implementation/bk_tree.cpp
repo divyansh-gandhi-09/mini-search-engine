@@ -23,7 +23,7 @@ void BKTree::clear() {
     root = nullptr;
 }
 
-// ✅ OPTIMIZED: Use single-row Levenshtein (O(n) space instead of O(n*m))
+//  OPTIMIZED: Use single-row Levenshtein (O(n) space instead of O(n*m))
 int BKTree::levenshtein(const string& a, const string& b) {
     const size_t n = a.size();
     const size_t m = b.size();
@@ -38,7 +38,7 @@ int BKTree::levenshtein(const string& a, const string& b) {
         return levenshtein(b, a);
     }
     
-    // ✅ Use single row instead of full matrix (80% memory reduction)
+    //  Use single row instead of full matrix (80% memory reduction)
     vector<int> prev(n + 1);
     vector<int> curr(n + 1);
     
@@ -90,13 +90,13 @@ void BKTree::insert(const std::string& word) {
 
 vector<string> BKTree::search(const string& target, int maxDistance) {
     vector<string> result;
-    result.reserve(50);  // ✅ Pre-allocate for common case
+    result.reserve(50);  //  Pre-allocate for common case
     
     if (!root) return result;
 
     queue<Node*> q;
     unordered_set<string> seen;
-    seen.reserve(50);  // ✅ Pre-allocate
+    seen.reserve(50);  //  Pre-allocate
     q.push(root);
 
     while (!q.empty()) {

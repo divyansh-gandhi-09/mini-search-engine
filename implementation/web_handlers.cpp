@@ -211,7 +211,7 @@ void WebHandlers::handleSuggest(const httplib::Request& req, httplib::Response& 
     res.set_content(json(filteredSuggestions).dump(), "application/json");
 }
 
-// ✅ OPTIMIZED: Read only first 500 chars for preview directly from file
+//  OPTIMIZED: Read only first 500 chars for preview directly from file
 std::string getQuickPreview(const std::string& filepath, size_t maxChars = 500) {
     std::ifstream file(filepath, std::ios::binary);
     if (!file) return "";
@@ -466,7 +466,7 @@ void WebHandlers::handleMoveToFolder(const httplib::Request& req, httplib::Respo
     }
 }
 
-// ✅ OPTIMIZED: Read only first 500 chars for listing preview
+//  OPTIMIZED: Read only first 500 chars for listing preview
 void WebHandlers::handleDocuments(const httplib::Request& req, httplib::Response& res) {
     std::string folderFilter = req.has_param("folder") ? req.get_param_value("folder") : "";
     
