@@ -1,5 +1,6 @@
 #include "document_manager.h"
 #include "persistence.h"
+#include "binary_persistence.h"
 #include "parser.h"
 #include "ranker.h"
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
+#include <mutex>
 namespace fs = std::filesystem;
 
 DocumentManager::DocumentManager() : docID(0) {}
@@ -21,30 +23,25 @@ bool DocumentManager::initialize() {
     std::unordered_map<int, std::string> loadedDocIdToFolder;
     int loadedDocID;
 
-    if (PersistenceManager::loadIndexFromFile(indexer, loadedDocIdToPath, loadedDocIdToRel,
-                                              loadedDocTokens, loadedDocMeta,
-                                              loadedVocabCount, loadedDocIdToFolder, loadedDocID)) {
+    // ✅ NEW: Uses PersistenceManager which tries binary first, then JSON
+    if (::loadIndex(indexer, loadedDocIdToPath, loadedDocIdToRel,
+                                      loadedDocTokens, loadedDocMeta,
+                                      loadedVocabCount, loadedDocIdToFolder, loadedDocID)) {
         updateFromPersistence(loadedDocIdToPath, loadedDocIdToRel,
                               loadedDocTokens, loadedDocMeta,
                               loadedVocabCount, loadedDocIdToFolder, loadedDocID);
         
-        rebuildSearchStructures(true);
+        // ✅ OPTIMIZED: Don't load content into memory (lazy loading)
+        rebuildSearchStructures(true); // true = clear content for lazy loading
         engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
         
-        std::cout << "Loaded index with " << docID << " documents\n";
+        std::cout << "✓ Loaded index with " << docID << " documents\n";
         std::unordered_set<std::string> folders;
         for (const auto& [id, folder] : docIdToFolder) {
             if (!folder.empty()) folders.insert(folder);
         }
         if (!folders.empty()) {
-            std::cout << "Found " << folders.size() << " folders: ";
-            bool first = true;
-            for (const auto& f : folders) {
-                if (!first) std::cout << ", ";
-                std::cout << f;
-                first = false;
-            }
-            std::cout << "\n";
+            std::cout << "✓ Found " << folders.size() << " folders\n";
         }
         
         return true;
@@ -96,7 +93,7 @@ void DocumentManager::buildFreshIndex() {
     docTokens.clear();
     docIdToPath.clear();
     docIdToRel.clear();
-    docIdToContent.clear();
+    docIdToContent.clear();  // Will be lazy-loaded
     docIdToFolder.clear();
     vocabCount.clear();
     docID = 0;
@@ -135,10 +132,10 @@ void DocumentManager::buildFreshIndex() {
     size_t totalChars = 0;
     std::unordered_set<std::string> folders;
 
-    //  Pre-allocate all maps
+    // Pre-allocate all maps
     docIdToPath.reserve(files.size());
     docIdToRel.reserve(files.size());
-    docIdToContent.reserve(files.size());
+    // ✅ DON'T pre-allocate docIdToContent - lazy load only
     docIdToFolder.reserve(files.size());
     docTokens.reserve(files.size());
     docMeta.reserve(files.size());
@@ -162,7 +159,8 @@ void DocumentManager::buildFreshIndex() {
                 if (tokens.empty()) continue;
 
                 docTokens[docID] = std::move(tokens);
-                docIdToContent[docID] = std::move(content);
+                // ✅ DON'T store content in memory - will lazy load
+                // docIdToContent[docID] = std::move(content);  // REMOVED
                 docIdToPath[docID] = path;
                 docIdToRel[docID] = entry.path().filename().string();
                 
@@ -176,7 +174,7 @@ void DocumentManager::buildFreshIndex() {
                     docMeta[docID] = std::to_string(std::time(nullptr));
                 }
 
-                totalChars += docIdToContent[docID].size();
+                totalChars += content.size();  // Just count, don't store
                 ++docID;
 
             } catch (const std::exception& e) {
@@ -188,9 +186,9 @@ void DocumentManager::buildFreshIndex() {
             std::chrono::steady_clock::now() - startTime).count();
         
         std::cout << "Progress: " << batch_end << "/" << files.size() 
-                  << " files processed (" << std::fixed << std::setprecision(1) 
+                  << " files (" << std::fixed << std::setprecision(1) 
                   << (100.0 * batch_end / files.size()) << "%) - "
-                  << elapsed << "ms elapsed\n";
+                  << elapsed << "ms\n";
     }
 
     std::cout << "Building inverted index...\n";
@@ -199,17 +197,16 @@ void DocumentManager::buildFreshIndex() {
     std::unordered_map<std::string, std::unordered_map<int,int>> tempIndex;
     std::unordered_set<std::string> allTerms;
     
-    //  Estimate vocabulary size for reserve
     size_t estimatedVocab = 0;
     for (const auto& [docId, tokens] : docTokens) {
         estimatedVocab += tokens.size();
     }
-    estimatedVocab = std::min(estimatedVocab / 3, estimatedVocab); // Rough estimate
+    estimatedVocab = std::min(estimatedVocab / 3, estimatedVocab);
     allTerms.reserve(estimatedVocab);
     
     for (const auto& [docId, tokens] : docTokens) {
         std::unordered_map<std::string, int> termFreq;
-        termFreq.reserve(tokens.size() / 2); //  Reserve
+        termFreq.reserve(tokens.size() / 2);
         
         for (const auto& token : tokens) {
             if (!token.empty()) {
@@ -250,14 +247,7 @@ void DocumentManager::buildFreshIndex() {
     std::cout << "Total characters: " << totalChars << "\n";
     std::cout << "Vocabulary size: " << vocabCount.size() << " unique terms\n";
     if (!folders.empty()) {
-        std::cout << "Folders found: " << folders.size() << " (";
-        bool first = true;
-        for (const auto& f : folders) {
-            if (!first) std::cout << ", ";
-            std::cout << f;
-            first = false;
-        }
-        std::cout << ")\n";
+        std::cout << "Folders found: " << folders.size() << "\n";
     }
     std::cout << "Time taken: " << totalTime << "ms\n";
     std::cout << "Average: " << (totalTime / static_cast<double>(docID)) << "ms per document\n";
@@ -265,25 +255,16 @@ void DocumentManager::buildFreshIndex() {
     
     saveIndex();
     engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
-    
-    std::cout << "Performing index validation search...\n";
-    if (docID > 0) {
-        try {
-            Ranker ranker;
-            auto testResults = engine->search("test", ranker);
-            std::cout << "Index validation complete. Ready for queries.\n";
-        } catch (const std::exception& e) {
-            std::cout << "Warning: Index validation failed: " << e.what() << "\n";
-        }
-    }
 }
 
 std::string DocumentManager::getDocumentContent(int docId) {
+    // Check if already in cache
     auto it = docIdToContent.find(docId);
     if (it != docIdToContent.end()) {
         return it->second;
     }
     
+    // Not in cache - load from disk
     auto pathIt = docIdToPath.find(docId);
     if (pathIt == docIdToPath.end()) {
         return "";
@@ -291,7 +272,8 @@ std::string DocumentManager::getDocumentContent(int docId) {
     
     try {
         std::string content = Parser::readFile(pathIt->second);
-        docIdToContent[docId] = content;
+        // Cache for future use (optional - can remove to save memory)
+        // docIdToContent[docId] = content;
         return content;
     } catch (const std::exception& e) {
         std::cout << "Warning: Could not load content for doc " << docId 
@@ -299,9 +281,13 @@ std::string DocumentManager::getDocumentContent(int docId) {
         return "";
     }
 }
-
 void DocumentManager::updateExistingIndex() {
     std::cout << "Updating existing index...\n";
+    if (docIdToPath.empty() && indexer.getIndex().empty()) {
+        std::cout << "Index is empty - running fresh build instead\n";
+        buildFreshIndex();
+        return;
+    }
     
     std::unordered_set<std::string> currentFiles;
     
@@ -516,7 +502,9 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         try {
             if (!fs::exists(folderPath)) {
                 fs::create_directories(folderPath);
-                std::cout << "Created folder: " << sanitizedFolder << "\n";
+                if (!silentMode) {  // ✅ Only log if not silent
+                    std::cout << "Created folder: " << sanitizedFolder << "\n";
+                }
             }
         } catch (const std::exception& e) {
             throw std::runtime_error("Failed to create folder: " + std::string(e.what()));
@@ -544,7 +532,11 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         throw std::runtime_error("Failed to write file: " + std::string(e.what()));
     }
 
-    int newId = docID++;
+    int newId;
+    {
+        std::lock_guard<std::mutex> lock(docIdMutex);
+        newId = docID++;
+    }
     docIdToPath[newId] = path;
     docIdToRel[newId] = filename;
     docIdToContent[newId] = content;
@@ -569,15 +561,39 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         docMeta[newId] = std::to_string(std::time(nullptr));
     }
     
-    engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
-    saveIndex();
+   if (!batchMode) {
+        engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+        saveIndex();  // ⚠️ Only save when NOT batching
+    }
     
-    std::cout << "Uploaded document: " << filename << " (ID: " << newId << ")" 
-              << (sanitizedFolder.empty() ? "" : " to folder: " + sanitizedFolder) << "\n";
+    if (!silentMode) {
+        std::cout << "Uploaded document: " << filename << " (ID: " << newId << ")" 
+                  << (sanitizedFolder.empty() ? "" : " to folder: " + sanitizedFolder);
+        
+        if (batchMode) {
+            std::cout << " [BATCH MODE - index not saved]";
+        }
+        std::cout << "\n";
+    }
     
     return newId;
 }
-
+void DocumentManager::finalizeBatch() {
+    auto startTime = std::chrono::steady_clock::now();
+    
+    std::cout << "\n=== Finalizing Batch Upload ===\n";
+    std::cout << "Rebuilding search engine...\n";
+    engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
+    
+    std::cout << "Saving index (one-time for entire batch)...\n";
+    saveIndex();
+    
+    auto finalizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - startTime).count();
+    
+    std::cout << "✅ Batch finalized successfully\n";
+    std::cout << "✅ Finalized in " << finalizeTime << "ms\n";
+}
 //  OPTIMIZED: Use move semantics for tokens
 bool DocumentManager::editDocument(int id, const std::string& newContent) {
     if (!docIdToPath.count(id)) return false;
@@ -703,7 +719,6 @@ std::vector<std::pair<int, double>> DocumentManager::search(const std::string& q
         return {};
     }
 }
-
 void DocumentManager::updateFromPersistence(
     const std::unordered_map<int, std::string>& loadedDocIdToPath,
     const std::unordered_map<int, std::string>& loadedDocIdToRel,
@@ -720,11 +735,13 @@ void DocumentManager::updateFromPersistence(
     vocabCount = loadedVocabCount;
     docIdToFolder = loadedDocIdToFolder;
     docID = loadedDocID;
+    // ✅ Note: docIdToContent is NOT loaded - lazy loading!
 }
 
 void DocumentManager::saveIndex() const {
     try {
-        PersistenceManager::saveIndexToFile(
+        // ✅ NEW: Uses binary persistence (with JSON fallback)
+        ::saveIndex(
             indexer,
             docIdToPath,
             docIdToRel,
@@ -734,9 +751,9 @@ void DocumentManager::saveIndex() const {
             docIdToFolder,
             docID
         );
-        std::cout << "Index saved successfully.\n";
+        std::cout << "✓ Index saved successfully.\n";
     } catch (const std::exception& e) {
-        std::cout << "Error saving index: " << e.what() << "\n";
+        std::cout << "✗ Error saving index: " << e.what() << "\n";
     }
 }
 

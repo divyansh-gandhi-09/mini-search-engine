@@ -109,6 +109,7 @@
           transform: translateY(-2px);
           box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .btn-secondary {
           background: #f8fafc;
           color: #4a5568;
@@ -238,7 +239,7 @@
         }
         .action-btn:hover { transform: translateY(-1px); }
         
-        /* Forms */
+        /* Management Section */
         .management-section {
           background: white;
           border-radius: 20px;
@@ -246,14 +247,210 @@
           margin-bottom: 2rem;
           box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
+        
+        /* Section Header with Mode Toggle */
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+          flex-wrap: wrap;
+          gap: 1rem;
+          padding-bottom: 0.75rem;
+          border-bottom: 2px solid #e2e8f0;
+        }
+        
         .section-heading {
           font-size: 1.5rem;
           font-weight: 700;
           color: #2d3748;
-          margin: 0 0 1.5rem 0;
-          padding-bottom: 0.75rem;
-          border-bottom: 2px solid #e2e8f0;
+          margin: 0;
         }
+        
+        /* Mode Selector */
+        .mode-selector {
+          display: flex;
+          gap: 0.5rem;
+          background: #f8fafc;
+          padding: 0.5rem;
+          border-radius: 12px;
+        }
+        
+        .mode-btn {
+          padding: 0.75rem 1.5rem;
+          border: 2px solid transparent;
+          border-radius: 8px;
+          background: transparent;
+          color: #4a5568;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: 0.95rem;
+        }
+        
+        .mode-btn:hover {
+          background: white;
+          color: #667eea;
+        }
+        
+        .mode-btn.active {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* Upload Mode Content */
+        .upload-mode-content {
+          display: none;
+          animation: fadeIn 0.3s ease;
+        }
+        
+        .upload-mode-content.active {
+          display: block;
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Dropzone */
+        .dropzone {
+          border: 3px dashed #cbd5e0;
+          border-radius: 16px;
+          padding: 3rem 2rem;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          background: #f8fafc;
+          margin-bottom: 1.5rem;
+        }
+        
+        .dropzone:hover {
+          border-color: #667eea;
+          background: #edf2f7;
+          transform: translateY(-2px);
+        }
+        
+        .dropzone.dragover {
+          border-color: #667eea;
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+          border-style: solid;
+        }
+        
+        .dropzone-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .dropzone h3 { font-size: 1.25rem; color: #2d3748; margin-bottom: 0.5rem; font-weight: 600; }
+        .dropzone p { color: #718096; font-size: 0.95rem; margin-bottom: 1rem; }
+        .dropzone-hint {
+          margin-top: 1rem;
+          padding: 0.75rem 1rem;
+          background: white;
+          border-radius: 8px;
+          font-size: 0.875rem;
+          color: #4a5568;
+          border-left: 4px solid #667eea;
+        }
+        .dropzone-hint strong { color: #2d3748; }
+        
+        /* Progress Section */
+        .progress-section {
+          display: none;
+          margin-top: 2rem;
+          padding: 1.5rem;
+          background: #f8fafc;
+          border-radius: 12px;
+        }
+        .progress-section.active { display: block; }
+        .progress-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.75rem;
+        }
+        .progress-label { font-weight: 600; color: #4a5568; font-size: 0.95rem; }
+        .progress-percentage { font-weight: 700; color: #667eea; font-size: 1.125rem; }
+        .progress-bar-container {
+          height: 12px;
+          background: #e2e8f0;
+          border-radius: 6px;
+          overflow: hidden;
+        }
+        .progress-bar-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+          transition: width 0.3s ease;
+          border-radius: 6px;
+          width: 0%;
+        }
+        
+        /* File Queue */
+        .file-queue-container { display: none; margin-top: 2rem; }
+        .file-queue-container.active { display: block; }
+        .queue-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+        .queue-title { font-size: 1.25rem; font-weight: 700; color: #2d3748; }
+        .queue-stats { display: flex; gap: 0.75rem; font-size: 0.875rem; flex-wrap: wrap; }
+        .stat-badge { padding: 0.375rem 0.75rem; border-radius: 8px; font-weight: 600; }
+        .stat-total { background: #e2e8f0; color: #4a5568; }
+        .stat-success { background: #c6f6d5; color: #22543d; }
+        .stat-failed { background: #fed7d7; color: #742a2a; }
+        .file-queue {
+          max-height: 400px;
+          overflow-y: auto;
+          background: #f8fafc;
+          border-radius: 12px;
+          padding: 1rem;
+        }
+        .file-queue::-webkit-scrollbar { width: 8px; }
+        .file-queue::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 4px; }
+        .file-queue::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+        .file-queue::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+        .file-queue-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem;
+          margin-bottom: 0.75rem;
+          background: white;
+          border-radius: 8px;
+          border-left: 4px solid #cbd5e0;
+          transition: all 0.3s ease;
+        }
+        .file-queue-item:last-child { margin-bottom: 0; }
+        .file-info { flex: 1; min-width: 0; }
+        .file-name { font-weight: 600; color: #2d3748; margin-bottom: 0.25rem; word-break: break-word; }
+        .file-meta { font-size: 0.875rem; color: #718096; }
+        .file-status {
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 0.875rem;
+          min-width: 100px;
+          text-align: center;
+          white-space: nowrap;
+        }
+        .status-pending { background: #e2e8f0; color: #4a5568; }
+        .status-processing { background: #bee3f8; color: #2c5282; animation: pulse 1.5s ease-in-out infinite; }
+        .status-success { background: #c6f6d5; color: #22543d; }
+        .status-error { background: #fed7d7; color: #742a2a; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .file-queue-item.processing { border-left-color: #4299e1; box-shadow: 0 2px 8px rgba(66, 153, 225, 0.2); }
+        .file-queue-item.success { border-left-color: #48bb78; }
+        .file-queue-item.error { border-left-color: #f56565; }
+        
+        /* Action Buttons */
+        .action-buttons { display: none; gap: 1rem; margin-top: 2rem; }
+        .action-buttons.active { display: flex; }
+        
+        /* Hidden file inputs */
+        input[type="file"] { display: none; }
+        
         .form-group {
           margin-bottom: 1rem;
         }
@@ -306,9 +503,6 @@
         
         /* Notifications */
         .notification {
-          position: fixed;
-          top: 20px;
-          right: 20px;
           background: white;
           border-radius: 8px;
           padding: 1rem;
@@ -337,249 +531,166 @@
           #search-box { min-width: auto; }
           .filter-controls { flex-direction: column; align-items: stretch; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
+          .mode-selector { flex-direction: column; width: 100%; }
+          .mode-btn { width: 100%; }
+          .action-buttons { flex-direction: column; }
+          .queue-header { flex-direction: column; align-items: flex-start; }
+          .file-queue-item { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+          .file-status { width: 100%; }
         }
-        /* Enhanced Modal Styles */
-.info-modal {
-  max-width: 900px;
-  max-height: 85vh;
-}
-
-.info-content {
-  padding: 1rem 0;
-}
-
-.info-content h3 {
-  color: #667eea;
-  
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
-  font-size: 1.25rem;
-  border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 0.5rem;
-}
-
-.info-content h3:first-child {
-  margin-top: 0;
-}
-
-.info-list {
-  list-style: none;
-  padding-left: 0;
-}
-
-.info-list li {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f7fafc;
-  line-height: 1.6;
-}
-
-.info-list li:last-child {
-  border-bottom: none;
-}
-
-.info-list code {
-  background: #f7fafc;
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.9em;
-  color: #e53e3e;
-  font-family: 'Courier New', monospace;
-}
-
-/* Large File Warning */
-.large-file-warning {
-  background: linear-gradient(135deg, #fef5e7 0%, #fdebd0 100%);
-  color: #856404;
-  padding: 1rem;
-  border-radius: 8px;
-  margin: 1rem 0;
-  border-left: 4px solid #f39c12;
-  font-weight: 600;
-}
-
-/* Document Content Wrapper */
-.doc-content-wrapper {
-  margin-top: 1.5rem;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.doc-text {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin: 0;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: #2d3748;
-}
-
-.doc-text mark {
-  background: linear-gradient(135deg, #fff59d 0%, #ffeb3b 100%);
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-weight: 600;
-}
-
-/* Modal Actions */
-.modal-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin: 1rem 0;
-  flex-wrap: wrap;
-}
-
-.modal-btn {
-  padding: 0.75rem 1.25rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-}
-
-.modal-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
-}
-
-/* Modal Meta Improvements */
-.modal-meta {
-  background: #f8fafc;
-  padding: 1rem;
-  border-radius: 8px;
-  margin: 1rem 0;
-  border-left: 4px solid #667eea;
-}
-
-.modal-meta .muted {
-  margin: 0.25rem 0;
-  font-size: 0.95rem;
-}
-
-/* Notification Styles */
-#notifications {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 400px;
-}
-
-.notification {
-  background: white;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-left: 4px solid #48bb78;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  animation: slideIn 0.3s ease;
-}
-
-.notification.error {
-  border-left-color: #f56565;
-}
-
-.notification.warning {
-  border-left-color: #ed8936;
-}
-
-.notification.info {
-  border-left-color: #4299e1;
-}
-
-.notification .close-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: #718096;
-  padding: 0;
-  margin-left: 1rem;
-  line-height: 1;
-}
-
-.notification .close-btn:hover {
-  color: #2d3748;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(400px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Loading Indicator */
-#loading-indicator {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Responsive Modal */
-@media (max-width: 768px) {
-  .modal-content {
-    width: 95%;
-    max-height: 90vh;
-    padding: 1.5rem;
-  }
-  
-  .info-modal {
-    max-width: 95%;
-  }
-  
-  .modal-actions {
-    flex-direction: column;
-  }
-  
-  .modal-btn {
-    width: 100%;
-  }
-}
+        
+        /* Modal Extras */
+        .info-modal { max-width: 900px; max-height: 85vh; }
+        .info-content { padding: 1rem 0; }
+        .info-content h3 {
+          color: #667eea;
+          margin-top: 1.5rem;
+          margin-bottom: 0.75rem;
+          font-size: 1.25rem;
+          border-bottom: 2px solid #e2e8f0;
+          padding-bottom: 0.5rem;
+        }
+        .info-content h3:first-child { margin-top: 0; }
+        .info-list { list-style: none; padding-left: 0; }
+        .info-list li { padding: 0.75rem 0; border-bottom: 1px solid #f7fafc; line-height: 1.6; }
+        .info-list li:last-child { border-bottom: none; }
+        .info-list code {
+          background: #f7fafc;
+          padding: 0.2rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.9em;
+          color: #e53e3e;
+          font-family: 'Courier New', monospace;
+        }
+        .large-file-warning {
+          background: linear-gradient(135deg, #fef5e7 0%, #fdebd0 100%);
+          color: #856404;
+          padding: 1rem;
+          border-radius: 8px;
+          margin: 1rem 0;
+          border-left: 4px solid #f39c12;
+          font-weight: 600;
+        }
+        .doc-content-wrapper {
+          margin-top: 1.5rem;
+          background: #f8fafc;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+        .doc-text {
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          background: white;
+          padding: 1.5rem;
+          border-radius: 8px;
+          margin: 0;
+          font-family: 'Courier New', monospace;
+          font-size: 0.9rem;
+          line-height: 1.6;
+          color: #2d3748;
+        }
+        .doc-text mark {
+          background: linear-gradient(135deg, #fff59d 0%, #ffeb3b 100%);
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-weight: 600;
+        }
+        .modal-actions { display: flex; gap: 0.75rem; margin: 1rem 0; flex-wrap: wrap; }
+        .modal-btn {
+          padding: 0.75rem 1.25rem;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 0.95rem;
+          transition: all 0.3s ease;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        .modal-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5); }
+        .modal-meta {
+          background: #f8fafc;
+          padding: 1rem;
+          border-radius: 8px;
+          margin: 1rem 0;
+          border-left: 4px solid #667eea;
+        }
+        .modal-meta .muted { margin: 0.25rem 0; font-size: 0.95rem; }
+        #notifications {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 10000;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          max-width: 400px;
+        }
+        .notification {
+          background: white;
+          border-radius: 8px;
+          padding: 1rem 1.25rem;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          border-left: 4px solid #48bb78;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          animation: slideIn 0.3s ease;
+        }
+        .notification.error { border-left-color: #f56565; }
+        .notification.warning { border-left-color: #ed8936; }
+        .notification.info { border-left-color: #4299e1; }
+        .notification .close-btn {
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          color: #718096;
+          padding: 0;
+          margin-left: 1rem;
+          line-height: 1;
+        }
+        .notification .close-btn:hover { color: #2d3748; }
+        @keyframes slideIn {
+          from { transform: translateX(400px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        #loading-indicator {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: white;
+          padding: 2rem;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+          z-index: 9999;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+        }
+        .spinner {
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #667eea;
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @media (max-width: 768px) {
+          .modal-content { width: 95%; max-height: 90vh; padding: 1.5rem; }
+          .info-modal { max-width: 95%; }
+          .modal-actions { flex-direction: column; }
+          .modal-btn { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -630,30 +741,137 @@
             </div>
         </section>
 
-        <!-- Upload Section -->
+        <!-- Upload Section with Batch Support -->
         <section class="management-section">
-            <h2 class="section-heading">Upload Documents</h2>
-            <form id="upload-form">
-                <div class="form-group">
-                    <label for="upload-file">Select File:</label>
-                    <input type="file" id="upload-file" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.txt,.md,.csv,.json,.log,.xml,.html,.doc,.docx">
+            <div class="section-header">
+                <h2 class="section-heading">📤 Upload Documents</h2>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="single">Single File</button>
+                    <button class="mode-btn" data-mode="batch">Batch Upload</button>
+                    <button class="mode-btn" data-mode="folder">Folder Upload</button>
                 </div>
-                <div class="form-group">
-                    <label for="upload-filename">Custom filename (optional):</label>
-                    <input type="text" id="upload-filename" placeholder="Leave empty to use original filename">
+            </div>
+
+            <!-- Single File Mode -->
+            <div id="single-mode" class="upload-mode-content active">
+                <div id="singleDropzone" class="dropzone">
+                    <div class="dropzone-icon">📄</div>
+                    <h3>Drop a file here or click to browse</h3>
+                    <p>Supports PDF, DOCX, images, text files, and more</p>
+                    <div class="dropzone-hint">
+                        <strong>Smart extraction:</strong> Complex files (PDF, DOCX, images) are automatically extracted • Text files are read instantly
+                    </div>
                 </div>
+                
+                <input type="file" id="upload-file" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.txt,.md,.csv,.json,.log,.xml,.html,.doc,.docx,.xlsx,.xls">
+                
+                <form id="upload-form">
+                    <div class="form-group">
+                        <label for="upload-filename">Custom filename (optional):</label>
+                        <input type="text" id="upload-filename" placeholder="Leave empty to use original filename">
+                    </div>
+                    <div class="form-group">
+                        <label for="folder-select">Folder:</label>
+                        <select id="folder-select">
+                            <option value="">-- Select Folder --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="upload-content">Or paste text content here:</label>
+                        <textarea id="upload-content" placeholder="Paste text content for manual entry"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Upload Document</button>
+                </form>
+            </div>
+
+            <!-- Batch Upload Mode -->
+            <div id="batch-mode" class="upload-mode-content">
+                <div id="batchDropzone" class="dropzone">
+                    <div class="dropzone-icon">📦</div>
+                    <h3>Drop multiple files here or click to browse</h3>
+                    <p>Upload many files at once - up to 100 files</p>
+                    <div class="dropzone-hint">
+                        <strong>Batch processing:</strong> All files are processed in parallel for maximum speed
+                    </div>
+                </div>
+                
+                <input type="file" id="batchFileInput" multiple accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.txt,.md,.csv,.json,.log,.xml,.html,.doc,.docx,.xlsx,.xls">
+                
                 <div class="form-group">
-                    <label for="folder-select">Folder:</label>
-                    <select id="folder-select">
-                        <option value="">-- Select Folder --</option>
+                    <label for="batch-folder-select">Destination Folder:</label>
+                    <select id="batch-folder-select">
+                        <option value="">Root (No Folder)</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="upload-content">Or paste text content here:</label>
-                    <textarea id="upload-content" placeholder="Paste text content for manual entry"></textarea>
+
+                <div id="batchProgressSection" class="progress-section">
+                    <div class="progress-header">
+                        <span class="progress-label">Upload Progress</span>
+                        <span class="progress-percentage" id="progressPercentage">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="batchProgressFill"></div>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Upload Document</button>
-            </form>
+
+                <div id="fileQueueContainer" class="file-queue-container">
+                    <div class="queue-header">
+                        <h3 class="queue-title">File Queue</h3>
+                        <div class="queue-stats">
+                            <span class="stat-badge stat-total">Total: <span id="batchStatTotal">0</span></span>
+                            <span class="stat-badge stat-success">✓ <span id="batchStatSuccess">0</span></span>
+                            <span class="stat-badge stat-failed">✗ <span id="batchStatFailed">0</span></span>
+                        </div>
+                    </div>
+                    <div id="fileQueue" class="file-queue"></div>
+                </div>
+
+                <div id="batchActionButtons" class="action-buttons">
+                    <button class="btn btn-primary" id="batchUploadBtn">🚀 Upload All Files</button>
+                    <button class="btn btn-secondary" id="batchClearBtn">🗑️ Clear Queue</button>
+                </div>
+            </div>
+
+            <!-- Folder Upload Mode -->
+            <div id="folder-mode" class="upload-mode-content">
+                <div id="folderDropzone" class="dropzone">
+                    <div class="dropzone-icon">📁</div>
+                    <h3>Drop an entire folder here or click to browse</h3>
+                    <p>Preserves folder structure and indexes all documents</p>
+                    <div class="dropzone-hint">
+                        <strong>Folder structure preserved:</strong> All subfolders and files are organized exactly as on your system
+                    </div>
+                </div>
+                
+                <input type="file" id="folderInput" webkitdirectory directory multiple>
+
+                <div id="folderProgressSection" class="progress-section">
+                    <div class="progress-header">
+                        <span class="progress-label">Upload Progress</span>
+                        <span class="progress-percentage" id="folderProgressPercentage">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="folderProgressFill"></div>
+                    </div>
+                </div>
+
+                <div id="folderQueueContainer" class="file-queue-container">
+                    <div class="queue-header">
+                        <h3 class="queue-title">Folder Contents</h3>
+                        <div class="queue-stats">
+                            <span class="stat-badge stat-total">Total: <span id="folderStatTotal">0</span></span>
+                            <span class="stat-badge stat-success">✓ <span id="folderStatSuccess">0</span></span>
+                            <span class="stat-badge stat-failed">✗ <span id="folderStatFailed">0</span></span>
+                        </div>
+                    </div>
+                    <div id="folderQueue" class="file-queue"></div>
+                </div>
+
+                <div id="folderActionButtons" class="action-buttons">
+                    <button class="btn btn-primary" id="folderUploadBtn">🚀 Upload Folder</button>
+                    <button class="btn btn-secondary" id="folderClearBtn">🗑️ Clear Queue</button>
+                </div>
+            </div>
         </section>
 
         <!-- Edit Section -->
@@ -672,40 +890,41 @@
             </form>
         </section>
     </div>
+    
     <!-- Help Modal -->
-<div id="help-modal" class="modal hidden">
-  <div class="modal-content">
-    <h2>Help & Technical Overview</h2>
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Help & Technical Overview</h2>
 
-    <h3>Search Engine Overview</h3>
-    <p>This mini search engine allows you to store, organize, and search documents efficiently using modern information retrieval techniques.</p>
+            <h3>Search Engine Overview</h3>
+            <p>This mini search engine allows you to store, organize, and search documents efficiently using modern information retrieval techniques.</p>
 
-    <h3>Core Features</h3>
-    <ul>
-      <li><strong>TF-IDF Ranking:</strong> Each document is vectorized using Term Frequency–Inverse Document Frequency, enabling relevance scoring based on query terms.</li>
-      <li><strong>Autocomplete:</strong> As you type, the system suggests possible query completions using prefix-based search structures for fast lookup.</li>
-      <li><strong>Spelling Correction (BK-Tree):</strong> Typo-tolerant correction is implemented via a Burkhard-Keller Tree, which finds the closest word matches by edit distance.</li>
-      <li><strong>Folder Organization:</strong> Documents can be grouped into folders for more efficient searching and management.</li>
-      <li><strong>Index Rebuild:</strong> You can refresh or rebuild the index at any time to incorporate new or modified documents.</li>
-      <li><strong>Metadata Tracking:</strong> The system tracks document IDs, names, and folders for quick retrieval and management operations.</li>
-    </ul>
+            <h3>Core Features</h3>
+            <ul>
+                <li><strong>TF-IDF Ranking:</strong> Each document is vectorized using Term Frequency—Inverse Document Frequency, enabling relevance scoring based on query terms.</li>
+                <li><strong>Autocomplete:</strong> As you type, the system suggests possible query completions using prefix-based search structures for fast lookup.</li>
+                <li><strong>Spelling Correction (BK-Tree):</strong> Typo-tolerant correction is implemented via a Burkhard-Keller Tree, which finds the closest word matches by edit distance.</li>
+                <li><strong>Folder Organization:</strong> Documents can be grouped into folders for more efficient searching and management.</li>
+                <li><strong>Batch Upload:</strong> Upload multiple files or entire folders with smart extraction routing.</li>
+                <li><strong>Index Rebuild:</strong> You can refresh or rebuild the index at any time to incorporate new or modified documents.</li>
+                <li><strong>Metadata Tracking:</strong> The system tracks document IDs, names, and folders for quick retrieval and management operations.</li>
+            </ul>
 
-    <h3>Usage Instructions</h3>
-    <ul>
-      <li><strong>Search:</strong> Enter a term or phrase and press <em>Search</em> to view ranked results. use 'and' / 'or' between terms to get boolean results</li>
-      <li><strong>Show All:</strong> Displays all indexed documents.</li>
-      <li><strong>Upload:</strong> Add new documents or text content manually.</li>
-      <li><strong>Edit:</strong> Modify existing document content.</li>
-      <li><strong>Delete:</strong> Permanently remove a document from the index.</li>
-      <li><strong>Update/Rebuild Index:</strong> Refresh the TF-IDF and BK-Tree structures when data changes significantly.</li>
-    </ul>
+            <h3>Usage Instructions</h3>
+            <ul>
+                <li><strong>Search:</strong> Enter a term or phrase and press <em>Search</em> to view ranked results. use 'and' / 'or' between terms to get boolean results</li>
+                <li><strong>Show All:</strong> Displays all indexed documents.</li>
+                <li><strong>Upload:</strong> Add new documents or text content manually.</li>
+                <li><strong>Edit:</strong> Modify existing document content.</li>
+                <li><strong>Delete:</strong> Permanently remove a document from the index.</li>
+                <li><strong>Update/Rebuild Index:</strong> Refresh the TF-IDF and BK-Tree structures when data changes significantly.</li>
+            </ul>
 
-    <button id="close-help" class="btn btn-secondary">Close</button>
-  </div>
-</div>
+            <button id="close-help" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
 
-
-
-<script src="app.js"></script> 
+    <script src="app.js"></script>
+    <script src="batch-upload.js"></script>
 </body>
 </html>

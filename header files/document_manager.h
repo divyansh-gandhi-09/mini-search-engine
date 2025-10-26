@@ -18,12 +18,14 @@ private:
     std::unordered_map<int, std::string> docMeta;
     std::unordered_map<std::string, int> vocabCount;
     std::unordered_map<int, std::string> docIdToFolder;
-
+    bool batchMode = false;  
+    bool silentMode = false;
     Indexer indexer;
     Trie autoComplete;
     BKTree typoCorrector;
     std::unique_ptr<SearchEngine> engine;
     int docID;
+    std::mutex docIdMutex;
 
     std::string extractFolderFromPath(const std::string& filepath);
 
@@ -33,7 +35,7 @@ public:
     void buildFreshIndex();
     void updateExistingIndex();
     void rebuildSearchStructures(bool clearContent = true);  // ✅ Added parameter
-
+    void setSilentMode(bool enabled) { silentMode = enabled; }
     int uploadDocument(const std::string& filename, const std::string& content, const std::string& folder = "");
     bool editDocument(int id, const std::string& newContent);
     bool deleteDocument(int id);
@@ -53,6 +55,8 @@ public:
     std::string getDocumentContent(int docId);
     const Indexer& getIndexer() const { return indexer; }
     int getDocID() const { return docID; }
+    void setBatchMode(bool enabled) { batchMode = enabled; }
+    void finalizeBatch();
 
     void updateFromPersistence(
         const std::unordered_map<int, std::string>& loadedDocIdToPath,
