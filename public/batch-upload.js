@@ -239,7 +239,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         showNotification(message, result.failed === 0 ? 'success' : 'warning');
         
+        // ✅ Refresh both stats AND folders
         window.dispatchEvent(new CustomEvent('refreshStats'));
+        window.dispatchEvent(new CustomEvent('refreshFolders'));
+        
+        // ✅ Also reload folders directly
+        await loadBatchFolders();
         
     } catch (error) {
         console.error('Batch upload error:', error);
@@ -286,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         dropzone.addEventListener('drop', async (e) => {
+            folderStructureMap.clear();
             e.preventDefault();
             dropzone.classList.remove('dragover');
             
@@ -304,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         folderInput.addEventListener('change', (e) => {
+            folderStructureMap.clear();
             const files = Array.from(e.target.files);
             files.forEach(file => {
                 const relativePath = file.webkitRelativePath || file.name;
@@ -372,7 +379,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function executeFolderUpload() {
+    // ✅ FIXED: Robust folder upload with better error handling
+async function executeFolderUpload() {
     const btn = document.getElementById('folderUploadBtn');
     if (!btn) return;
     
@@ -380,61 +388,221 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = '⏳ Uploading Folder...';
     
     try {
-        const formData = new FormData();
+        // ✅ CRITICAL FIX: Split into chunks to avoid memory/timeout issues
+        const CHUNK_SIZE = 500;  // Upload 500 files at a time
+        const chunks = [];
         
-        folderFiles.forEach(file => {
-            const relativePath = folderStructureMap.get(file) || file.name;
-            formData.append(`file-${relativePath}`, file);
-        });
-
-        // ✅ REMOVED: Fake progress loop
-        updateProgress('folderProgressFill', 'folderProgressPercentage', 0);
-        
-        folderFiles.forEach((_, i) => {
-            updateFolderItemStatus(i, 'processing', 'Uploading...');
-        });
-
-        // ✅ Actually upload
-        console.time('Folder Upload');
-        const response = await fetch('/upload/folder', {
-            method: 'POST',
-            body: formData
-        });
-        console.timeEnd('Folder Upload');
-
-        const result = await response.json();
-        
-        updateStat('folderStatSuccess', result.successful || 0);
-        updateStat('folderStatFailed', result.failed || 0);
-        
-        if (result.results) {
-            result.results.forEach((fileResult, index) => {
-                const status = fileResult.success ? 'success' : 'error';
-                const text = fileResult.success 
-                    ? '✓ Success' 
-                    : `✗ ${fileResult.error || 'Failed'}`;
-                updateFolderItemStatus(index, status, text);
-            });
+        for (let i = 0; i < folderFiles.length; i += CHUNK_SIZE) {
+            chunks.push(folderFiles.slice(i, i + CHUNK_SIZE));
         }
-
+        
+        console.log(`📦 Splitting ${folderFiles.length} files into ${chunks.length} chunks of ${CHUNK_SIZE}`);
+        
+        let totalSuccess = 0;
+        let totalFailed = 0;
+        let allResults = [];
+        
+        // Process each chunk sequentially
+        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+            const chunk = chunks[chunkIndex];
+            const formData = new FormData();
+            
+            // Add files from this chunk
+            chunk.forEach(file => {
+                const relativePath = folderStructureMap.get(file) || file.name;
+                formData.append(`file-${relativePath}`, file);
+            });
+            
+            console.log(`📤 Uploading chunk ${chunkIndex + 1}/${chunks.length} (${chunk.length} files)`);
+            
+            // Update UI: mark current chunk as processing
+            const chunkStartIndex = chunkIndex * CHUNK_SIZE;
+            for (let i = 0; i < chunk.length; i++) {
+                updateFolderItemStatus(chunkStartIndex + i, 'processing', 'Uploading...');
+            }
+            
+            // Upload this chunk with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.error(`Chunk ${chunkIndex + 1} timeout after 5 minutes`);
+            }, 300000); // 5 minutes per chunk
+            
+            try {
+                const response = await fetch('/upload/folder', {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal,
+                    keepalive: true
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                // Validate result
+                if (!result || typeof result.successful === 'undefined') {
+                    throw new Error('Invalid response format from server');
+                }
+                
+                // Accumulate results
+                totalSuccess += result.successful || 0;
+                totalFailed += result.failed || 0;
+                
+                // Update individual file statuses for this chunk
+                if (result.results && Array.isArray(result.results)) {
+                    result.results.forEach((fileResult, resultIndex) => {
+                        const globalIndex = chunkStartIndex + resultIndex;
+                        const status = fileResult.success ? 'success' : 'error';
+                        const text = fileResult.success 
+                            ? '✓ Success' 
+                            : `✗ ${fileResult.error || 'Failed'}`;
+                        updateFolderItemStatus(globalIndex, status, text);
+                        allResults.push(fileResult);
+                    });
+                }
+                
+                // Update overall progress
+                const progress = ((chunkIndex + 1) / chunks.length) * 100;
+                updateProgress('folderProgressFill', 'folderProgressPercentage', progress);
+                updateStat('folderStatSuccess', totalSuccess);
+                updateStat('folderStatFailed', totalFailed);
+                
+                console.log(`✅ Chunk ${chunkIndex + 1}/${chunks.length} done: ${result.successful} success, ${result.failed} failed`);
+                
+            } catch (chunkError) {
+                clearTimeout(timeoutId);
+                
+                console.error(`❌ Chunk ${chunkIndex + 1} failed:`, chunkError);
+                
+                // Mark all files in this chunk as failed
+                for (let i = 0; i < chunk.length; i++) {
+                    const globalIndex = chunkStartIndex + i;
+                    updateFolderItemStatus(globalIndex, 'error', '✗ Upload failed');
+                    totalFailed++;
+                }
+                
+                // Ask user if they want to continue with remaining chunks
+                if (chunkIndex < chunks.length - 1) {
+                    const continueUpload = confirm(
+                        `Chunk ${chunkIndex + 1}/${chunks.length} failed.\n` +
+                        `Error: ${chunkError.message}\n\n` +
+                        `Continue uploading remaining ${chunks.length - chunkIndex - 1} chunks?`
+                    );
+                    
+                    if (!continueUpload) {
+                        throw new Error(`Upload cancelled after chunk ${chunkIndex + 1} failed`);
+                    }
+                }
+            }
+            
+            // Small delay between chunks to avoid overwhelming server
+            if (chunkIndex < chunks.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        
+        // Final progress update
         updateProgress('folderProgressFill', 'folderProgressPercentage', 100);
-
-        const message = result.failed === 0
-            ? `✅ Folder uploaded: ${result.successful} files successful!`
-            : `⚠️ Folder upload complete: ${result.successful} succeeded, ${result.failed} failed`;
         
-        showNotification(message, result.failed === 0 ? 'success' : 'warning');
+        // Show final result
+        const message = totalFailed === 0
+            ? `✅ All ${totalSuccess} files uploaded successfully!`
+            : `⚠️ Upload complete: ${totalSuccess} succeeded, ${totalFailed} failed`;
         
+        showNotification(message, totalFailed === 0 ? 'success' : 'warning');
+        
+        console.log(`🎉 Folder upload complete: ${totalSuccess} ✅ | ${totalFailed} ❌`);
+        
+        // Refresh UI
         window.dispatchEvent(new CustomEvent('refreshStats'));
+        window.dispatchEvent(new CustomEvent('refreshFolders'));
+        await loadBatchFolders();
         
     } catch (error) {
-        console.error('Folder upload error:', error);
-        showNotification('❌ Upload error: ' + error.message, 'error');
+        console.error('❌ Folder upload error:', error);
+        
+        // User-friendly error messages
+        let userMessage = '❌ Upload failed: ' + error.message;
+        
+        if (error.name === 'AbortError') {
+            userMessage = '⏱️ Upload timeout - try a smaller folder or check server performance.';
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
+            userMessage = '🔌 Connection lost - check if the server is running and try again.';
+        } else if (error.message.includes('cancelled')) {
+            userMessage = '🛑 Upload cancelled by user.';
+        }
+        
+        showNotification(userMessage, 'error');
+        
+        // Mark any remaining processing items as failed
+        folderFiles.forEach((_, i) => {
+            const statusEl = document.getElementById(`folder-status-${i}`);
+            if (statusEl && statusEl.classList.contains('status-processing')) {
+                updateFolderItemStatus(i, 'error', '✗ Upload failed');
+            }
+        });
+        
     } finally {
         btn.disabled = false;
         btn.textContent = '🚀 Upload Folder';
     }
 }
+window.addEventListener('refreshStats', async () => {
+        console.log('Refreshing stats after upload...');
+        try {
+            const response = await fetch('/stats');
+            const stats = await response.json();
+            
+            // Update the stats display
+            const statsEl = document.getElementById('stats-display');
+            if (statsEl && stats) {
+                const {
+                    total_documents,
+                    indexed_documents,
+                    vocabulary_size,
+                    folders,
+                    root_documents,
+                    file_types,
+                    total_content_size
+                } = stats;
+                
+                statsEl.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">${indexed_documents}</div>
+                            <div class="stat-label">Documents</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${folders.length}</div>
+                            <div class="stat-label">Folders</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${vocabulary_size.toLocaleString()}</div>
+                            <div class="stat-label">Unique Terms</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${formatFileSize(total_content_size)}</div>
+                            <div class="stat-label">Total Size</div>
+                        </div>
+                    </div>
+                `;
+                
+                console.log('Stats updated:', { documents: indexed_documents, vocab: vocabulary_size });
+            }
+            
+            // Also reload folders dropdown
+            await loadBatchFolders();
+            
+        } catch (error) {
+            console.error('Failed to refresh stats:', error);
+        }
+    });
+
     
 
 
@@ -459,27 +627,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // UTILITY FUNCTIONS
     // ========================================
     async function loadBatchFolders() {
-        try {
-            const response = await fetch('/folders');
-            const folders = await response.json();
-            
-            const selects = ['folder-select', 'batch-folder-select'];
-            selects.forEach(selectId => {
-                const select = document.getElementById(selectId);
-                if (select) {
-                    select.innerHTML = '<option value="">Root (No Folder)</option>';
-                    folders.forEach(f => {
-                        const option = document.createElement('option');
-                        option.value = f;
-                        option.textContent = f;
-                        select.appendChild(option);
-                    });
-                }
-            });
-        } catch (error) {
-            console.error('Failed to load folders:', error);
-        }
+    try {
+        const response = await fetch('/folders');
+        const folders = await response.json();
+        
+        console.log('📁 Loaded folders:', folders);
+        
+        // ✅ Update upload form dropdowns
+        const selects = ['folder-select', 'batch-folder-select'];
+        selects.forEach(selectId => {
+            const select = document.getElementById(selectId);
+            if (select) {
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">Root (No Folder)</option>';
+                folders.forEach(f => {
+                    const option = document.createElement('option');
+                    option.value = f;
+                    option.textContent = f;
+                    if (f === currentValue) option.selected = true;
+                    select.appendChild(option);
+                });
+            }
+        });
+        
+        // ✅ FIX: Trigger app.js to update move-to-folder dropdowns
+        window.dispatchEvent(new CustomEvent('foldersUpdated', { 
+            detail: { folders: folders } 
+        }));
+        
+        return folders;
+        
+    } catch (error) {
+        console.error('Failed to load folders:', error);
+        return [];
     }
+}
 
     function createQueueItem(name, size, index, prefix) {
         const item = document.createElement('div');

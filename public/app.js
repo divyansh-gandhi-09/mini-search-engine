@@ -145,6 +145,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (statsEl) statsEl.innerHTML = '<div class="error">Failed to load statistics</div>';
     }
   }
+  
+  window.addEventListener('refreshFolders', async () => {
+    console.log('🔄 Refreshing folders...');
+    await loadFolders();
+  });
 
   function displayStats() {
     if (!currentStats || !statsEl) return;
@@ -817,6 +822,19 @@ document.addEventListener("keydown", (e) => {
     const modals = $$(".modal:not(.hidden)");
     modals.forEach((modal) => modal.classList.add("hidden"));
   }
+});
+window.addEventListener('foldersUpdated', (event) => {
+    console.log('🔄 Folders updated, refreshing dropdowns...');
+    availableFolders = event.detail.folders;
+    
+    // Update all move-to-folder dropdowns in search results
+    populateMoveToFolderDropdowns();
+});
+
+// ✅ Also refresh folders when stats refresh
+window.addEventListener('refreshFolders', async () => {
+    console.log('🔄 Refreshing folders...');
+    await loadFolders();
 });
 
 // === Help Modal ===

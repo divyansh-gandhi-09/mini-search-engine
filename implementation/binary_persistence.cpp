@@ -1,5 +1,4 @@
 #include "binary_persistence.h"
-#include "persistence.h"
 #include <fstream>
 #include <iostream>
 #include <filesystem>
@@ -317,7 +316,7 @@ void saveIndex(
         
     } catch (const std::exception& e) {
         std::cerr << "Failed to save binary index: " << e.what() << "\n";
-        throw;
+        throw;  // ✅ Just throw - no JSON fallback
     }
 }
 
@@ -337,8 +336,7 @@ bool loadIndex(
         return true;
     }
 
-    // Fallback to JSON
-    std::cout << "Binary index not found, trying JSON...\n";
-    return PersistenceManager::loadIndexFromFile(indexer, docIdToPath, docIdToRel, docTokens,
-                                                 docMeta, vocabCount, docIdToFolder, docID);
+    std::cout << "No binary index found (index.bin missing)\n";
+    std::cout << "Will build fresh index from ./data folder\n";
+    return false;
 }

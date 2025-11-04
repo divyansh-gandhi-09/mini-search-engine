@@ -1,5 +1,4 @@
 #include "document_manager.h"
-#include "persistence.h"
 #include "binary_persistence.h"
 #include "parser.h"
 #include "ranker.h"
@@ -10,6 +9,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <thread>
 namespace fs = std::filesystem;
 
 DocumentManager::DocumentManager() : docID(0) {}
@@ -23,25 +23,28 @@ bool DocumentManager::initialize() {
     std::unordered_map<int, std::string> loadedDocIdToFolder;
     int loadedDocID;
 
-    // ✅ NEW: Uses PersistenceManager which tries binary first, then JSON
+    //  NEW: Uses PersistenceManager which tries binary first, then JSON
     if (::loadIndex(indexer, loadedDocIdToPath, loadedDocIdToRel,
                                       loadedDocTokens, loadedDocMeta,
                                       loadedVocabCount, loadedDocIdToFolder, loadedDocID)) {
         updateFromPersistence(loadedDocIdToPath, loadedDocIdToRel,
                               loadedDocTokens, loadedDocMeta,
                               loadedVocabCount, loadedDocIdToFolder, loadedDocID);
-        
-        // ✅ OPTIMIZED: Don't load content into memory (lazy loading)
+    
+        //  OPTIMIZED: Don't load content into memory (lazy loading)
         rebuildSearchStructures(true); // true = clear content for lazy loading
         engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
         
-        std::cout << "✓ Loaded index with " << docID << " documents\n";
+        std::cout<<"==================================\n";
+        std::cout << " Loaded index with " << docID << " documents\n";
+        
         std::unordered_set<std::string> folders;
         for (const auto& [id, folder] : docIdToFolder) {
             if (!folder.empty()) folders.insert(folder);
         }
         if (!folders.empty()) {
-            std::cout << "✓ Found " << folders.size() << " folders\n";
+            std::cout << " Found " << folders.size() << " folders\n";
+            std::cout<<"==================================\n";
         }
         
         return true;
@@ -85,7 +88,7 @@ std::string DocumentManager::extractFolderFromPath(const std::string& filepath) 
 }
 
 void DocumentManager::buildFreshIndex() {
-    std::cout << "Building fresh index...\n";
+    std::cout << "\n==========Building fresh index...==========\n";
     
     indexer.clear();
     autoComplete.clear();
@@ -190,8 +193,8 @@ void DocumentManager::buildFreshIndex() {
                   << (100.0 * batch_end / files.size()) << "%) - "
                   << elapsed << "ms\n";
     }
-
-    std::cout << "Building inverted index...\n";
+    std:: cout<<"=============================================\n";
+    std::cout << "Building inverted index...\n";               
     auto index_start = std::chrono::steady_clock::now();
     
     std::unordered_map<std::string, std::unordered_map<int,int>> tempIndex;
@@ -362,7 +365,7 @@ void DocumentManager::updateExistingIndex() {
                 }
 
                 docTokens[id] = std::move(tokens);
-                docIdToContent[id] = std::move(content);
+                //docIdToContent[id] = std::move(content);
                 indexer.indexDocumentFromTokens(id, docTokens[id]);
 
                 docIdToPath[id] = file;
@@ -456,14 +459,24 @@ void DocumentManager::rebuildSearchStructures(bool clearContent) {
     std::cout << "Rebuilt search structures: " << vocab.size() << " vocabulary terms\n";
 }
 
+
 int DocumentManager::uploadDocument(const std::string& filename, const std::string& content, const std::string& folder) {
-    if (filename.empty() || content.empty()) {
-        throw std::invalid_argument("Filename and content cannot be empty");
+    // ✅ FIX 1: Better validation with specific error messages
+    if (filename.empty()) {
+        throw std::invalid_argument("Filename cannot be empty");
+    }
+    
+    if (content.empty()) {
+        throw std::invalid_argument("Content cannot be empty for file: " + filename);
     }
 
     std::string sanitizedFolder = folder;
     
+    // ✅ FIX 2: Better folder sanitization with logging
     if (!sanitizedFolder.empty()) {
+        std::string originalFolder = sanitizedFolder;
+        
+        // Remove dangerous characters
         sanitizedFolder.erase(
             std::remove_if(sanitizedFolder.begin(), sanitizedFolder.end(), 
                 [](unsigned char c) { 
@@ -475,9 +488,10 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         );
 
         if (sanitizedFolder.empty()) {
-            throw std::invalid_argument("Invalid folder name after sanitization");
+            throw std::invalid_argument("Invalid folder name after sanitization (was: '" + originalFolder + "')");
         }
         
+        // Check reserved names
         std::vector<std::string> reserved = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", 
                                              "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", 
                                              "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
@@ -496,56 +510,121 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
     }
     
+    // ✅ FIX 3: Create folder path with error handling
     std::string folderPath = sanitizedFolder.empty() ? "./data/" : "./data/" + sanitizedFolder + "/";
     
     if (!sanitizedFolder.empty()) {
         try {
             if (!fs::exists(folderPath)) {
                 fs::create_directories(folderPath);
-                if (!silentMode) {  // ✅ Only log if not silent
+                if (!silentMode) {
                     std::cout << "Created folder: " << sanitizedFolder << "\n";
                 }
             }
+        } catch (const std::filesystem::filesystem_error& e) {
+            throw std::runtime_error("Failed to create folder '" + sanitizedFolder + "': " + e.what());
         } catch (const std::exception& e) {
-            throw std::runtime_error("Failed to create folder: " + std::string(e.what()));
+            throw std::runtime_error("Failed to create folder '" + sanitizedFolder + "': " + std::string(e.what()));
         }
     }
     
+    // ✅ FIX 4: Handle path construction with validation
     std::string path = folderPath + filename;
     
-    if (fs::exists(path)) {
-        throw std::runtime_error("File already exists: " + filename);
+    // Validate the final path
+    if (path.length() > 255) {
+        throw std::invalid_argument("Full path too long (max 255 chars): " + path);
     }
     
+    // ✅ FIX 5: Better duplicate file handling
+    if (fs::exists(path)) {
+        // Instead of throwing, append a number
+        std::string baseName = filename;
+        std::string extension = "";
+        
+        size_t dotPos = filename.find_last_of('.');
+        if (dotPos != std::string::npos) {
+            baseName = filename.substr(0, dotPos);
+            extension = filename.substr(dotPos);
+        }
+        
+        int counter = 1;
+        std::string newFilename;
+        do {
+            newFilename = baseName + "_" + std::to_string(counter) + extension;
+            path = folderPath + newFilename;
+            counter++;
+        } while (fs::exists(path) && counter < 1000);
+        
+        if (counter >= 1000) {
+            throw std::runtime_error("Too many duplicate files: " + filename);
+        }
+        
+        if (!silentMode) {
+            std::cout << "⚠️ File exists, renamed to: " << newFilename << "\n";
+        }
+    }
+    
+    // ✅ FIX 6: Write file with better error handling
     try {
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         if (!file) {
             throw std::runtime_error("Could not create file: " + path);
         }
+        
         file << content;
         file.close();
         
-        if (!fs::exists(path)) {
-            throw std::runtime_error("File was not created successfully");
+        if (!file.good()) {
+            throw std::runtime_error("Error writing to file: " + path);
         }
-    } catch (const std::exception& e) {
-        throw std::runtime_error("Failed to write file: " + std::string(e.what()));
+        
+        if (!fs::exists(path)) {
+            throw std::runtime_error("File was not created successfully: " + path);
+        }
+        
+        // Verify file size
+        auto fileSize = fs::file_size(path);
+        if (fileSize != content.size()) {
+            throw std::runtime_error("File size mismatch: expected " + 
+                                   std::to_string(content.size()) + " bytes, got " + 
+                                   std::to_string(fileSize) + " bytes");
+        }
+        
+    } catch (const std::filesystem::filesystem_error& e) {
+        throw std::runtime_error("Filesystem error writing file '" + path + "': " + e.what());
+    } catch (const std::ios_base::failure& e) {
+        throw std::runtime_error("I/O error writing file '" + path + "': " + e.what());
     }
 
+    // ✅ FIX 7: Thread-safe ID assignment
     int newId;
     {
         std::lock_guard<std::mutex> lock(docIdMutex);
         newId = docID++;
     }
+    
+    // Store metadata
     docIdToPath[newId] = path;
-    docIdToRel[newId] = filename;
-    docIdToContent[newId] = content;
+    docIdToRel[newId] = fs::path(path).filename().string();  // Use actual filename (may be renamed)
+    // Don't store content in memory - lazy load only
     docIdToFolder[newId] = sanitizedFolder;
     
-    auto tokens = Parser::tokenize(content);
+    // ✅ FIX 8: Tokenize with error handling
+    std::vector<std::string> tokens;
+    try {
+        tokens = Parser::tokenize(content);
+        if (tokens.empty()) {
+            throw std::runtime_error("Tokenization produced no tokens for file: " + filename);
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Tokenization failed for '" + filename + "': " + e.what());
+    }
+    
     docTokens[newId] = std::move(tokens);
     indexer.indexDocumentFromTokens(newId, docTokens[newId]);
 
+    // Update vocabularies
     for (const auto& w : docTokens[newId]) {
         if (!w.empty()) {
             autoComplete.insert(w);
@@ -554,24 +633,28 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
     }
 
+    // Get file timestamp
     try {
         docMeta[newId] = std::to_string(fs::last_write_time(path).time_since_epoch().count());
     } catch (const std::exception& e) {
-        std::cout << "Warning: Could not get file timestamp: " << e.what() << "\n";
+        if (!silentMode) {
+            std::cout << "Warning: Could not get file timestamp for " << filename << ": " << e.what() << "\n";
+        }
         docMeta[newId] = std::to_string(std::time(nullptr));
     }
     
-   if (!batchMode) {
+    // Save index if not in batch mode
+    if (!batchMode) {
         engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
-        saveIndex();  // ⚠️ Only save when NOT batching
+        saveIndex();
     }
     
     if (!silentMode) {
-        std::cout << "Uploaded document: " << filename << " (ID: " << newId << ")" 
+        std::cout << "Uploaded document: " << docIdToRel[newId] << " (ID: " << newId << ")" 
                   << (sanitizedFolder.empty() ? "" : " to folder: " + sanitizedFolder);
         
         if (batchMode) {
-            std::cout << " [BATCH MODE - index not saved]";
+            std::cout << " [BATCH MODE]";
         }
         std::cout << "\n";
     }
@@ -585,14 +668,40 @@ void DocumentManager::finalizeBatch() {
     std::cout << "Rebuilding search engine...\n";
     engine = std::make_unique<SearchEngine>(indexer.getIndex(), docID);
     
-    std::cout << "Saving index (one-time for entire batch)...\n";
-    saveIndex();
+    auto rebuildTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - startTime).count();
+    std::cout << "✅ Search engine rebuilt in " << rebuildTime << "ms\n";
+    
+    // ✅ FIX: Save index asynchronously so HTTP response isn't blocked
+    std::cout << "💾 Saving index in background...\n";
+    
+    // Launch async save (don't wait for it)
+    std::thread([this]() {
+        try {
+            auto saveStart = std::chrono::steady_clock::now();
+            ::saveIndex(
+                indexer,
+                docIdToPath,
+                docIdToRel,
+                docTokens,
+                docMeta,
+                vocabCount,
+                docIdToFolder,
+                docID
+            );
+            auto saveTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - saveStart).count();
+            std::cout << "✅ Index saved successfully in " << saveTime << "ms (background)\n";
+        } catch (const std::exception& e) {
+            std::cerr << "❌ Background index save failed: " << e.what() << "\n";
+        }
+    }).detach();  // Detach so it runs independently
     
     auto finalizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startTime).count();
     
-    std::cout << "✅ Batch finalized successfully\n";
-    std::cout << "✅ Finalized in " << finalizeTime << "ms\n";
+    std::cout << "✅ Batch finalized (index saving in background)\n";
+    std::cout << "⚡ Finalized in " << finalizeTime << "ms\n";
 }
 //  OPTIMIZED: Use move semantics for tokens
 bool DocumentManager::editDocument(int id, const std::string& newContent) {
@@ -751,9 +860,9 @@ void DocumentManager::saveIndex() const {
             docIdToFolder,
             docID
         );
-        std::cout << "✓ Index saved successfully.\n";
+        std::cout << " Index saved successfully.\n";
     } catch (const std::exception& e) {
-        std::cout << "✗ Error saving index: " << e.what() << "\n";
+        std::cout << " Error saving index: " << e.what() << "\n";
     }
 }
 

@@ -7,7 +7,6 @@
 int main() {
     std::cout << "\n------ Mini Search Engine (Web) ------\n";
 
-    // Create necessary directories if they don't exist
     if (!std::filesystem::exists("./data")) {
         std::filesystem::create_directory("./data");
         std::cout << "Created ./data directory\n";
@@ -26,12 +25,26 @@ int main() {
     }
 
     httplib::Server svr;
+    
+    // ✅ FIX: Set timeouts for large uploads
+    svr.set_read_timeout(1200, 0);   // 10 minutes for reading request
+    svr.set_write_timeout(1200, 0);  // 10 minutes for writing response
+    svr.set_keep_alive_max_count(100);  // Allow keep-alive connections
+    svr.set_keep_alive_timeout(60);  // 10 seconds keep-alive timeout
+    svr.set_payload_max_length(1024 * 1024 * 1024); // 1GB max payload
+    
     WebHandlers handlers(docManager);
     handlers.setupRoutes(svr);
 
     std::cout << "Server running at http://localhost:8080\n";
+    std::cout << "Timeouts: Read/Write = 600s, Keep-Alive = 5s\n";
+    std::cout << "Max payload: 1GB\n";
     std::cout << "Make sure the Python extractor is running on port 5000\n";
-    svr.listen("0.0.0.0", 8080);
+    
+    if (!svr.listen("0.0.0.0", 8080)) {
+        std::cerr << "Failed to start server on port 8080\n";
+        return 1;
+    }
 
     return 0;
 }

@@ -4,19 +4,43 @@
 #include "document_handlers.h"
 #include "folder_handlers.h"
 #include "stats_handlers.h"
+#include "../third_party/json.hpp"
+
+using json = nlohmann::json;
 
 WebHandlers::WebHandlers(DocumentManager& manager) : docManager(manager) {}
 
 void WebHandlers::setupCORS(httplib::Server& svr) {
-    svr.set_pre_routing_handler([](const auto&, auto& res) {
+    // ✅ Pre-routing handler for ALL requests including errors
+    svr.set_pre_routing_handler([](const auto& req, auto& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.set_header("Access-Control-Max-Age", "86400"); // 24 hours
+        return httplib::Server::HandlerResponse::Unhandled;
+    });
+    
+    // ✅ Error handler to ensure CORS on error responses
+    svr.set_error_handler([](const auto& req, auto& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        return httplib::Server::HandlerResponse::Unhandled;
+        
+        // Provide proper JSON error response
+        json error_response = {
+            {"error", "Request failed"},
+            {"status", res.status},
+            {"success", false}
+        };
+        res.set_content(error_response.dump(), "application/json");
     });
-    svr.Options(".*", [](const auto&, auto&) { return; });
+    
+    // Handle OPTIONS requests
+    svr.Options(".*", [](const auto&, auto& res) { 
+        res.status = 204; // No Content
+        return; 
+    });
 }
-
 void WebHandlers::setupRoutes(httplib::Server& svr) {
     setupCORS(svr);
     svr.set_mount_point("/", "./public");

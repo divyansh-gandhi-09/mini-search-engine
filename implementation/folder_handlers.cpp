@@ -9,24 +9,44 @@ namespace fs = std::filesystem;
 void FolderHandlers::handleFolders(DocumentManager& docManager, const httplib::Request&, httplib::Response& res) {
     std::unordered_set<std::string> uniqueFolders;
     
+    // Get folders from indexed documents
     for (const auto& [id, folder] : docManager.getDocIdToFolder()) {
         if (!folder.empty()) uniqueFolders.insert(folder);
     }
     
-    try {
-        if (fs::exists("./data")) {
-            for (const auto& entry : fs::directory_iterator("./data")) {
+    //  Recursively scan filesystem for ALL folders (including empty ones)
+    std::function<void(const fs::path&, const std::string&)> scanFolders;
+    scanFolders = [&](const fs::path& dir, const std::string& prefix) {
+        try {
+            for (const auto& entry : fs::directory_iterator(dir)) {
                 if (entry.is_directory()) {
-                    uniqueFolders.insert(entry.path().filename().string());
+                    std::string folderName = prefix.empty() 
+                        ? entry.path().filename().string()
+                        : prefix + "/" + entry.path().filename().string();
+                    
+                    uniqueFolders.insert(folderName);
+                    
+                    // Recursively scan subdirectories
+                    scanFolders(entry.path(), folderName);
                 }
             }
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Could not scan directory " << dir << ": " << e.what() << "\n";
         }
-    } catch (...) {}
+    };
+    
+    // Start recursive scan
+    if (fs::exists("./data")) {
+        scanFolders("./data", "");
+    }
     
     json j = json::array();
     for (const auto& folder : uniqueFolders) {
         j.push_back(folder);
     }
+    
+    std::cout << " Found " << uniqueFolders.size() << " folders (including empty)\n";
+    
     res.set_content(j.dump(), "application/json");
 }
 

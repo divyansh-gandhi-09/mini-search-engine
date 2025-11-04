@@ -13,7 +13,7 @@ void StatsHandlers::handleHealth(const httplib::Request&, httplib::Response& res
 void StatsHandlers::handleStats(DocumentManager& docManager, const httplib::Request&, httplib::Response& res) {
     json stats;
     
-    stats["total_documents"] = docManager.getDocID();
+    stats["total_documents"] = docManager.getDocIdToPath().size();
     stats["indexed_documents"] = docManager.getDocIdToPath().size();
     stats["vocabulary_size"] = docManager.getVocabCount().size();
     
