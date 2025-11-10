@@ -11,7 +11,7 @@ using json = nlohmann::json;
 WebHandlers::WebHandlers(DocumentManager& manager) : docManager(manager) {}
 
 void WebHandlers::setupCORS(httplib::Server& svr) {
-    // ✅ Pre-routing handler for ALL requests including errors
+    //  Pre-routing handler for ALL requests including errors
     svr.set_pre_routing_handler([](const auto& req, auto& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -20,7 +20,7 @@ void WebHandlers::setupCORS(httplib::Server& svr) {
         return httplib::Server::HandlerResponse::Unhandled;
     });
     
-    // ✅ Error handler to ensure CORS on error responses
+    //  Error handler to ensure CORS on error responses
     svr.set_error_handler([](const auto& req, auto& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");

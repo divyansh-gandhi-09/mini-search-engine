@@ -6,9 +6,7 @@
 
 namespace fs = std::filesystem;
 
-// ========================================
-// BINARY PERSISTENCE HELPER METHODS
-// ========================================
+
 
 void BinaryPersistence::writeInt(std::ofstream& out, int value) {
     out.write(reinterpret_cast<const char*>(&value), sizeof(int));
@@ -50,9 +48,6 @@ std::vector<std::string> BinaryPersistence::readStringVector(std::ifstream& in) 
     return vec;
 }
 
-// ========================================
-// SAVE BINARY INDEX
-// ========================================
 
 void BinaryPersistence::saveBinary(
     const Indexer& indexer,
@@ -159,9 +154,7 @@ void BinaryPersistence::saveBinary(
               << " MB in " << saveTime << "ms\n";
 }
 
-// ========================================
-// LOAD BINARY INDEX
-// ========================================
+
 
 bool BinaryPersistence::loadBinary(
     Indexer& indexer,
@@ -294,10 +287,7 @@ bool BinaryPersistence::loadBinary(
     }
 }
 
-// ========================================
-// UNIFIED SAVE/LOAD INTERFACE
-// Global functions that try binary first, fall back to JSON
-// ========================================
+
 
 void saveIndex(
     const Indexer& indexer,

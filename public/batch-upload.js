@@ -633,7 +633,7 @@ window.addEventListener('refreshStats', async () => {
         
         console.log('📁 Loaded folders:', folders);
         
-        // ✅ Update upload form dropdowns
+        //  Update upload form dropdowns
         const selects = ['folder-select', 'batch-folder-select'];
         selects.forEach(selectId => {
             const select = document.getElementById(selectId);
@@ -650,7 +650,7 @@ window.addEventListener('refreshStats', async () => {
             }
         });
         
-        // ✅ FIX: Trigger app.js to update move-to-folder dropdowns
+        // ✅FIX: Trigger app.js to update move-to-folder dropdowns
         window.dispatchEvent(new CustomEvent('foldersUpdated', { 
             detail: { folders: folders } 
         }));

@@ -41,7 +41,7 @@ private:
     static std::vector<std::string> readStringVector(std::ifstream& in);
 };
 
-// ✅ GLOBAL FUNCTIONS - Unified save/load interface
+//  GLOBAL FUNCTIONS - Unified save/load interface
 // These try binary first, fall back to JSON
 void saveIndex(
     const Indexer& indexer,
