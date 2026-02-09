@@ -39,20 +39,20 @@ except ImportError as e:
     HTML_AVAILABLE = False
     print(f"⚠️ HTML parsing unavailable: {e}")
 
-# ✅ CHECK CRITICAL DEPENDENCIES
+#  CHECK CRITICAL DEPENDENCIES
 try:
     import fitz
-    print(f"✅ PyMuPDF (fitz) version: {fitz.version}")
+    print(f" PyMuPDF (fitz) version: {fitz.version}")
 except ImportError as e:
-    print(f"❌ CRITICAL: PyMuPDF not available: {e}")
+    print(f" CRITICAL: PyMuPDF not available: {e}")
     print("   Install with: pip install PyMuPDF")
     sys.exit(1)
 
 try:
     from PIL import Image
-    print(f"✅ Pillow (PIL) available")
+    print(f" Pillow (PIL) available")
 except ImportError as e:
-    print(f"❌ CRITICAL: Pillow not available: {e}")
+    print(f" CRITICAL: Pillow not available: {e}")
     print("   Install with: pip install Pillow")
     sys.exit(1)
 
@@ -79,7 +79,7 @@ app.add_middleware(
 # Use all CPU cores
 import multiprocessing as mp
 MAX_WORKERS = mp.cpu_count()
-logger.info(f"🚀 Initialized with {MAX_WORKERS} parallel workers")
+logger.info(f" Initialized with {MAX_WORKERS} parallel workers")
 
 SUPPORTED_EXTENSIONS = {
     'pdf': 'PDF documents',
@@ -107,7 +107,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
     try:
         logger.info(f"📄 Extracting PDF: {filename} ({len(content)} bytes)")
         
-        # ✅ Verify content is not empty
+        #  Verify content is not empty
         if not content or len(content) < 100:
             logger.error(f"❌ PDF too small or empty: {filename}")
             return {
@@ -116,7 +116,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
                 'error': 'PDF file is empty or corrupted'
             }
         
-        # ✅ Check if it's actually a PDF
+        #  Check if it's actually a PDF
         if b'%PDF' not in content[:1024]:  # Check first 1KB
             logger.error(f"❌ Not a valid PDF: {filename}")
             return {'success': False, 'error': 'File is not a valid PDF'}
@@ -132,7 +132,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
                 page_text = page.get_text()
                 if page_text.strip():
                     text_parts.append(page_text)
-                    logger.debug(f"  ✅ Page {page_num}: {len(page_text)} chars")
+                    logger.debug(f"   Page {page_num}: {len(page_text)} chars")
                 else:
                     logger.warning(f"  ⚠️ Page {page_num}: Empty")
             except Exception as e:
@@ -150,7 +150,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
                 'error': f'No text extracted from {page_count} pages (scanned PDF?)'
             }
         
-        logger.info(f"✅ PDF extracted: {len(full_text)} chars from {len(text_parts)} pages")
+        logger.info(f" PDF extracted: {len(full_text)} chars from {len(text_parts)} pages")
         
         return {
             'text': full_text,
@@ -193,7 +193,7 @@ def extract_from_image(content: bytes, filename: str) -> dict:
         text = pytesseract.image_to_string(image, config='--oem 3 --psm 6')
         
         cleaned_text = clean_text(text)
-        logger.info(f"✅ OCR extracted: {len(cleaned_text)} chars")
+        logger.info(f" OCR extracted: {len(cleaned_text)} chars")
         
         return {
             'text': cleaned_text,
@@ -227,7 +227,7 @@ def extract_from_docx(content: bytes, filename: str) -> dict:
                     text_parts.append(" | ".join(row_text))
         
         cleaned_text = clean_text("\n".join(text_parts))
-        logger.info(f"✅ DOCX extracted: {len(cleaned_text)} chars")
+        logger.info(f" DOCX extracted: {len(cleaned_text)} chars")
         
         return {
             'text': cleaned_text,
@@ -259,7 +259,7 @@ def extract_from_excel(content: bytes, filename: str) -> dict:
                 text_parts.append(df.to_string())
         
         cleaned_text = clean_text("\n\n".join(text_parts))
-        logger.info(f"✅ Excel extracted: {len(cleaned_text)} chars")
+        logger.info(f" Excel extracted: {len(cleaned_text)} chars")
         
         return {
             'text': cleaned_text,
@@ -296,7 +296,7 @@ def extract_from_html(content: bytes, filename: str) -> dict:
         
         text = soup.get_text()
         cleaned_text = clean_text(text)
-        logger.info(f"✅ HTML extracted: {len(cleaned_text)} chars")
+        logger.info(f" HTML extracted: {len(cleaned_text)} chars")
         
         return {
             'text': cleaned_text,
@@ -321,7 +321,7 @@ def extract_from_text(content: bytes, filename: str) -> dict:
         try:
             text = content.decode(encoding)
             cleaned_text = clean_text(text)
-            logger.info(f"✅ Text extracted ({encoding}): {len(cleaned_text)} chars")
+            logger.info(f" Text extracted ({encoding}): {len(cleaned_text)} chars")
             return {
                 'text': cleaned_text,
                 'extraction_method': f'text-{encoding}',
@@ -431,7 +431,7 @@ async def extract_batch_parallel(files: List[UploadFile] = File(...)):
     
     logger.info(f"📥 Read {len(file_data)} files, starting parallel extraction...")
     
-    # ✅ Extract ALL files in parallel with ThreadPoolExecutor
+    #  Extract ALL files in parallel with ThreadPoolExecutor
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
@@ -449,7 +449,7 @@ async def extract_batch_parallel(files: List[UploadFile] = File(...)):
                 completed += 1
                 
                 if result['success']:
-                    logger.info(f"✅ [{completed}/{len(files)}] {filename}: {len(result['text'])} chars")
+                    logger.info(f"[{completed}/{len(files)}] {filename}: {len(result['text'])} chars")
                 else:
                     logger.error(f"❌ [{completed}/{len(files)}] {filename}: {result.get('error', 'Unknown')}")
                 
@@ -469,7 +469,7 @@ async def extract_batch_parallel(files: List[UploadFile] = File(...)):
     successful = [r for r in results if r.get('success')]
     failed = [r for r in results if not r.get('success')]
     
-    logger.info(f"🎉 Batch complete: {len(successful)} ✅ | {len(failed)} ❌")
+    logger.info(f"🎉 Batch complete: {len(successful)} | {len(failed)} ❌")
     
     # Log failed files for debugging
     if failed:
@@ -526,8 +526,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Document Text Extractor v3.0.1 - Enhanced Error Logging")
     print("=" * 60)
-    print(f"✅ PyMuPDF: {fitz.version}")
-    print(f"✅ Workers: {MAX_WORKERS}")
+    print(f" PyMuPDF: {fitz.version}")
+    print(f" Workers: {MAX_WORKERS}")
     print(f"Supported formats: {len(SUPPORTED_EXTENSIONS)}")
     print("Starting on http://0.0.0.0:5000")
     print("=" * 60)

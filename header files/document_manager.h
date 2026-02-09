@@ -34,7 +34,7 @@ public:
     bool initialize();
     void buildFreshIndex();
     void updateExistingIndex();
-    void rebuildSearchStructures(bool clearContent = true);  // ✅ Added parameter
+    void rebuildSearchStructures(bool clearContent = true);  //  Added parameter
     void setSilentMode(bool enabled) { silentMode = enabled; }
     int uploadDocument(const std::string& filename, const std::string& content, const std::string& folder = "");
     bool editDocument(int id, const std::string& newContent);

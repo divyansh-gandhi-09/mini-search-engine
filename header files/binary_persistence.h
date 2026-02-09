@@ -7,7 +7,7 @@
 // Binary persistence class - for fast index loading/saving
 class BinaryPersistence {
 public:
-    // Save index in fast binary format (~10x faster than JSON)
+    // Save index in fast binary format 
     static void saveBinary(
         const Indexer& indexer,
         const std::unordered_map<int, std::string>& docIdToPath,
@@ -19,7 +19,7 @@ public:
         int docID
     );
 
-    // Load binary index (47s → ~5s)
+    // Load binary index 
     static bool loadBinary(
         Indexer& indexer,
         std::unordered_map<int, std::string>& docIdToPath,
