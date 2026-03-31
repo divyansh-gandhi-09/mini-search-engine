@@ -21,7 +21,7 @@ bool DocumentManager::initialize() {
     std::unordered_map<int, std::string> loadedDocMeta;
     std::unordered_map<std::string, int> loadedVocabCount;
     std::unordered_map<int, std::string> loadedDocIdToFolder;
-    int loadedDocID;
+    int loadedDocID=0;
 
     //  NEW: Uses PersistenceManager which tries binary first, then JSON
     if (::loadIndex(indexer, loadedDocIdToPath, loadedDocIdToRel,
@@ -311,35 +311,36 @@ void DocumentManager::updateExistingIndex() {
     if (fs::exists("./data")) {
         collectFiles("./data");
     }
+    std::unordered_map<std::string, int> pathToDocId;
+    pathToDocId.reserve(docIdToPath.size());
+    for (const auto& [id, path] : docIdToPath) {
+        pathToDocId[path] = id;
+    }
+
 
     int newFiles = 0, modifiedFiles = 0, deletedFiles = 0;
 
     for (const auto& file : currentFiles) {
-        bool needsReindex = false;
-        int id = -1;
+    bool needsReindex = false;
 
-        for (auto& [docId, path] : docIdToPath) {
-            if (path == file) {
-                id = docId;
-                break;
-            }
-        }
+    auto it = pathToDocId.find(file);
+    int id = (it != pathToDocId.end()) ? it->second : -1;
 
-        if (id == -1) {
-            needsReindex = true;
-            id = docID++;
-            newFiles++;
-        } else {
+    if (id == -1) {
+        needsReindex = true;
+        id = docID;
+        newFiles++;
+    }  else {
             try {
                 auto ftime = fs::last_write_time(file).time_since_epoch().count();
                 if (std::stoll(docMeta[id]) < ftime) {
                     needsReindex = true;
                     modifiedFiles++;
                 }
-            } catch (const std::exception& e) {
-                std::cout << "Warning: Could not check modification time for " << file << "\n";
-                needsReindex = true;
-            }
+            }  catch (const std::exception& e) {
+            std::cout << "Warning: Could not check modification time for " << file << "\n";
+            needsReindex = true;
+        }
         }
 
         if (needsReindex) {
@@ -375,13 +376,15 @@ void DocumentManager::updateExistingIndex() {
                 std::string folder = extractFolderFromPath(file);
                 docIdToFolder[id] = folder;
 
-                for (auto& w : docTokens[id]) {
+                std::unordered_set<std::string> uniqueWords(docTokens[id].begin(), docTokens[id].end());
+                for (const auto& w : uniqueWords) {
                     if (!w.empty()) {
                         autoComplete.insert(w);
                         typoCorrector.insert(w);
                         vocabCount[w]++;
                     }
                 }
+                if (id == docID) docID++;
             } catch (const std::exception& e) {
                 std::cout << "Error updating file " << file << ": " << e.what() << "\n";
             }
@@ -461,7 +464,7 @@ void DocumentManager::rebuildSearchStructures(bool clearContent) {
 
 
 int DocumentManager::uploadDocument(const std::string& filename, const std::string& content, const std::string& folder) {
-    // ✅ FIX 1: Better validation with specific error messages
+    //   Better validation with specific error messages
     if (filename.empty()) {
         throw std::invalid_argument("Filename cannot be empty");
     }
@@ -472,7 +475,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
 
     std::string sanitizedFolder = folder;
     
-    // ✅ FIX 2: Better folder sanitization with logging
+    //   Better folder sanitization with logging
     if (!sanitizedFolder.empty()) {
         std::string originalFolder = sanitizedFolder;
         
@@ -510,7 +513,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
     }
     
-    // ✅ FIX 3: Create folder path with error handling
+    //  Create folder path with error handling
     std::string folderPath = sanitizedFolder.empty() ? "./data/" : "./data/" + sanitizedFolder + "/";
     
     if (!sanitizedFolder.empty()) {
@@ -528,7 +531,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
     }
     
-    // ✅ FIX 4: Handle path construction with validation
+    //  Handle path construction with validation
     std::string path = folderPath + filename;
     
     // Validate the final path
@@ -536,7 +539,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         throw std::invalid_argument("Full path too long (max 255 chars): " + path);
     }
     
-    // ✅ FIX 5: Better duplicate file handling
+    //  Better duplicate file handling
     if (fs::exists(path)) {
         // Instead of throwing, append a number
         std::string baseName = filename;
@@ -561,11 +564,11 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         }
         
         if (!silentMode) {
-            std::cout << "⚠️ File exists, renamed to: " << newFilename << "\n";
+            std::cout << " File exists, renamed to: " << newFilename << "\n";
         }
     }
     
-    // ✅ FIX 6: Write file with better error handling
+    //  Write file with better error handling
     try {
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         if (!file) {
@@ -597,7 +600,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
         throw std::runtime_error("I/O error writing file '" + path + "': " + e.what());
     }
 
-    // ✅ FIX 7: Thread-safe ID assignment
+    // Thread-safe ID assignment
     int newId;
     {
         std::lock_guard<std::mutex> lock(docIdMutex);
@@ -610,7 +613,7 @@ int DocumentManager::uploadDocument(const std::string& filename, const std::stri
     // Don't store content in memory - lazy load only
     docIdToFolder[newId] = sanitizedFolder;
     
-    // ✅ FIX 8: Tokenize with error handling
+    // Tokenize with error handling
     std::vector<std::string> tokens;
     try {
         tokens = Parser::tokenize(content);
@@ -670,9 +673,9 @@ void DocumentManager::finalizeBatch() {
     
     auto rebuildTime = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startTime).count();
-    std::cout << "✅ Search engine rebuilt in " << rebuildTime << "ms\n";
+    std::cout << " Search engine rebuilt in " << rebuildTime << "ms\n";
     
-    // ✅ FIX: Save index asynchronously so HTTP response isn't blocked
+    //  Save index asynchronously so HTTP response isn't blocked
     std::cout << "💾 Saving index in background...\n";
     
     // Launch async save (don't wait for it)
@@ -691,17 +694,17 @@ void DocumentManager::finalizeBatch() {
             );
             auto saveTime = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - saveStart).count();
-            std::cout << "✅ Index saved successfully in " << saveTime << "ms (background)\n";
+            std::cout << " Index saved successfully in " << saveTime << "ms (background)\n";
         } catch (const std::exception& e) {
-            std::cerr << "❌ Background index save failed: " << e.what() << "\n";
+            std::cerr << " Background index save failed: " << e.what() << "\n";
         }
     }).detach();  // Detach so it runs independently
     
     auto finalizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startTime).count();
     
-    std::cout << "✅ Batch finalized (index saving in background)\n";
-    std::cout << "⚡ Finalized in " << finalizeTime << "ms\n";
+    std::cout << " Batch finalized (index saving in background)\n";
+    std::cout << " Finalized in " << finalizeTime << "ms\n";
 }
 //  OPTIMIZED: Use move semantics for tokens
 bool DocumentManager::editDocument(int id, const std::string& newContent) {
@@ -844,12 +847,12 @@ void DocumentManager::updateFromPersistence(
     vocabCount = loadedVocabCount;
     docIdToFolder = loadedDocIdToFolder;
     docID = loadedDocID;
-    // ✅ Note: docIdToContent is NOT loaded - lazy loading!
+    //  Note: docIdToContent is NOT loaded - lazy loading!
 }
 
 void DocumentManager::saveIndex() const {
     try {
-        // ✅ NEW: Uses binary persistence (with JSON fallback)
+        //  NEW: Uses binary persistence (with JSON fallback)
         ::saveIndex(
             indexer,
             docIdToPath,

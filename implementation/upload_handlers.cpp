@@ -153,7 +153,7 @@ void UploadHandlers::handleBatchUpload(DocumentManager& docManager, const httpli
 
         std::cout << "\nBATCH: " << files.size() << " files\n";
         
-        // ✅ Enable both batch mode AND silent mode
+        //  Enable both batch mode AND silent mode
         docManager.setBatchMode(true);
         docManager.setSilentMode(true);
 
@@ -226,7 +226,7 @@ void UploadHandlers::handleBatchUpload(DocumentManager& docManager, const httpli
             }
         }
 
-        // ✅ Disable silent mode before finalize (so we see the finalize output)
+        //  Disable silent mode before finalize (so we see the finalize output)
         docManager.setSilentMode(false);
         docManager.setBatchMode(false);
         docManager.finalizeBatch();
@@ -260,7 +260,7 @@ void UploadHandlers::handleBatchUpload(DocumentManager& docManager, const httpli
 // ========================================
 
 void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httplib::Request& req, httplib::Response& res) {
-    // ✅ FIX: Set proper headers for long uploads
+    //  Set proper headers for long uploads
     res.set_header("Connection", "keep-alive");
     res.set_header("Keep-Alive", "timeout=600");
     
@@ -303,7 +303,7 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
         std::vector<std::tuple<std::string, std::string, std::string>> directFiles;
         std::vector<std::tuple<std::string, std::string, std::string>> extractFiles;
 
-        // ✅ FIX 1: Better path extraction with detailed logging
+        //  : Better path extraction with detailed logging
         std::cout << "📋 Processing file paths...\n";
         int skippedFiles = 0;
         
@@ -316,10 +316,10 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
                 relativePath = relativePath.substr(prefix.length());
             }
             
-            // ✅ FIX 2: Normalize ALL path separators FIRST
+            // Normalize ALL path separators FIRST
             std::replace(relativePath.begin(), relativePath.end(), '\\', '/');
             
-            // ✅ FIX 3: Remove leading path artifacts more robustly
+            //  Remove leading path artifacts more robustly
             bool changed = true;
             while (changed && !relativePath.empty()) {
                 changed = false;
@@ -346,19 +346,19 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
                 }
             }
             
-            // ✅ FIX 4: Remove trailing slashes
+            // Remove trailing slashes
             while (!relativePath.empty() && relativePath.back() == '/') {
                 relativePath.pop_back();
             }
             
-            // ✅ FIX 5: Validate path after cleaning
+            //  Validate path after cleaning
             if (relativePath.empty()) {
                 std::cerr << "⚠️ Skipping empty path from field: " << fieldName << "\n";
                 skippedFiles++;
                 continue;
             }
             
-            // ✅ FIX 6: Check for invalid characters
+            //  Check for invalid characters
             if (relativePath.find("..") != std::string::npos) {
                 std::cerr << "⚠️ Skipping path with '..' : " << relativePath << "\n";
                 skippedFiles++;
@@ -375,7 +375,7 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
                 filename = relativePath.substr(lastSlash + 1);
             }
             
-            // ✅ FIX 7: Validate filename is not empty
+            //  Validate filename is not empty
             if (filename.empty()) {
                 std::cerr << "⚠️ Skipping empty filename from path: " << relativePath << "\n";
                 skippedFiles++;
@@ -387,7 +387,7 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
                 folder.pop_back();
             }
             
-            // ✅ FIX 8: Track folders more carefully
+            //  Track folders more carefully
             if (!folder.empty()) {
                 // Add the full folder path
                 createdFolders.insert(folder);
@@ -408,7 +408,7 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
                 }
             }
             
-            // ✅ FIX 9: Log the mapping for debugging
+            //  Log the mapping for debugging
             if (files.size() <= 20) {  // Only log for small uploads
                 std::cout << "   📄 " << filename 
                           << (folder.empty() ? " (root)" : " → " + folder) << "\n";
@@ -433,123 +433,56 @@ void UploadHandlers::handleFolderUpload(DocumentManager& docManager, const httpl
         std::cout << "📁 Unique folders: " << createdFolders.size() << "\n";
         std::cout << "--------------------------------------------\n";
 
-        // ✅ FIX 10: Process direct files with CONTROLLED parallelism
-// ✅ FIX: Process files in controlled batches with limited concurrency
+        //  Process direct files with CONTROLLED parallelism
+//  Process files in controlled batches with limited concurrency
 auto directStart = std::chrono::steady_clock::now();
 
-const size_t MAX_CONCURRENT = 4;  // Process 4 batches at a time
-const size_t BATCH_SIZE = 100;    // 100 files per batch
+std::cout << " Processing " << directFiles.size() << " direct-read files...\n";
 
-std::cout << "⚡ Processing " << directFiles.size() 
-          << " files in batches of " << BATCH_SIZE 
-          << " (max " << MAX_CONCURRENT << " concurrent)\n";
-
-for (size_t batch_start = 0; batch_start < directFiles.size(); batch_start += (BATCH_SIZE * MAX_CONCURRENT)) {
-    // Create limited number of futures
-    std::vector<std::future<std::vector<json>>> batch_futures;
-    batch_futures.reserve(MAX_CONCURRENT);
+for (size_t j = 0; j < directFiles.size(); ++j) {
+    const auto& [filename, folder, content] = directFiles[j];
     
-    for (size_t i = 0; i < MAX_CONCURRENT && (batch_start + i * BATCH_SIZE) < directFiles.size(); ++i) {
-        size_t start = batch_start + (i * BATCH_SIZE);
-        size_t end = std::min(start + BATCH_SIZE, directFiles.size());
-        
-        batch_futures.push_back(std::async(std::launch::async, 
-            [&docManager, &directFiles, start, end]() -> std::vector<json> {
-                std::vector<json> batch_results;
-                batch_results.reserve(end - start);
-                
-                for (size_t j = start; j < end; ++j) {
-                    const auto& [filename, folder, content] = directFiles[j];
-                    
-                    try {
-                        if (content.empty()) {
-                            batch_results.push_back({
-                                {"filename", filename}, 
-                                {"folder", folder},
-                                {"status", "error"}, 
-                                {"error", "Empty file"},
-                                {"success", false}
-                            });
-                            continue;
-                        }
-                        
-                        int newId = docManager.uploadDocument(filename, content, folder);
-                        
-                        batch_results.push_back({
-                            {"filename", filename}, 
-                            {"folder", folder},
-                            {"status", "success"}, 
-                            {"id", newId},
-                            {"method", "direct_read"},
-                            {"success", true}
-                        });
-                        
-                    } catch (const std::exception& e) {
-                        batch_results.push_back({
-                            {"filename", filename}, 
-                            {"folder", folder},
-                            {"status", "error"}, 
-                            {"error", std::string(e.what())},
-                            {"success", false}
-                        });
-                    }
-                }
-                
-                return batch_results;
-            }
-        ));
+    if (content.empty()) {
+        failCount++;
+        results.push_back({
+            {"filename", filename}, {"folder", folder},
+            {"status", "error"}, {"error", "Empty file"},
+            {"success", false}
+        });
+        continue;
     }
     
-    // Wait for current batch to finish before starting next
-    for (auto& future : batch_futures) {
-        try {
-            auto batch_results = future.get();
-            for (const auto& result : batch_results) {
-                results.push_back(result);
-                if (result.value("success", false)) {
-                    successCount++;
-                } else {
-                    failCount++;
-                }
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "❌ Batch error: " << e.what() << "\n";
-            failCount++;
-        }
+    try {
+        int newId = docManager.uploadDocument(filename, content, folder);
+        successCount++;
+        results.push_back({
+            {"filename", filename}, {"folder", folder},
+            {"status", "success"}, {"id", newId},
+            {"method", "direct_read"}, {"success", true}
+        });
+    } catch (const std::exception& e) {
+        failCount++;
+        results.push_back({
+            {"filename", filename}, {"folder", folder},
+            {"status", "error"}, {"error", e.what()},
+            {"success", false}
+        });
     }
     
-    // Progress report every 400 files
-    if ((successCount + failCount) % 400 == 0 && (successCount + failCount) > 0) {
-        std::cout << "📊 Progress: " << (successCount + failCount) 
-                  << "/" << directFiles.size() << " files\n" << std::flush;
+    // Progress log every 500 files
+    if ((j + 1) % 500 == 0) {
+        std::cout << "📊 Progress: " << (j + 1) << "/" 
+                  << directFiles.size() << " files\n" << std::flush;
     }
 }
 
-// Collect remaining results
-/*for (auto& future : futures) {
-    try {
-        auto batchResults = future.get();
-        for (const auto& result : batchResults) {
-            results.push_back(result);
-            if (result.value("success", false)) {
-                successCount++;
-            } else {
-                failCount++;
-            }
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "❌ Final batch error: " << e.what() << "\n";
-        failCount++;
-    }
-}*/
-        
-        auto directTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - directStart).count();
-        std::cout << "✅ Direct-read done in " << directTime << "ms ";
-        if (directFiles.size() > 0) {
-            std::cout << "(" << (directTime / static_cast<double>(directFiles.size())) << "ms/file)";
-        }
-        std::cout << "\n";
+auto directTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - directStart).count();
+std::cout << " Direct-read done in " << directTime << "ms";
+if (!directFiles.empty()) {
+    std::cout << " (" << (directTime / static_cast<double>(directFiles.size())) << "ms/file)";
+}
+std::cout << "\n";
 
         // Process extraction files (if any)
         if (!extractFiles.empty()) {
@@ -567,7 +500,7 @@ for (size_t batch_start = 0; batch_start < directFiles.size(); batch_start += (B
             auto extractorResponse = cli.Post("/extract/batch", items);
 
             if (!extractorResponse || extractorResponse->status != 200) {
-                std::cerr << "❌ Extractor service failed\n";
+                std::cerr << " Extractor service failed\n";
                 failCount += extractFiles.size();
                 for (const auto& [filename, folder, _] : extractFiles) {
                     results.push_back({
@@ -581,7 +514,7 @@ for (size_t batch_start = 0; batch_start < directFiles.size(); batch_start += (B
             } else {
                 auto batchResults = json::parse(extractorResponse->body);
                 auto extractedResults = batchResults["results"];
-                std::cout << "✅ Extractor returned " << extractedResults.size() << " results\n";
+                std::cout << " Extractor returned " << extractedResults.size() << " results\n";
 
                 for (const auto& result : extractedResults) {
                     std::string filename = result["filename"];
@@ -641,12 +574,12 @@ for (size_t batch_start = 0; batch_start < directFiles.size(); batch_start += (B
         docManager.finalizeBatch();
         auto saveTime = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - saveStart).count();
-        std::cout << "✅ Finalized in " << saveTime << "ms\n";
+        std::cout << " Finalized in " << saveTime << "ms\n";
 
         auto totalTime = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - totalStart).count();
 
-        std::cout << "🎉 Folder upload complete: " << successCount << " ✅, "
+        std::cout << "🎉 Folder upload complete: " << successCount << " , "
                   << failCount << " ❌ in " << totalTime << "ms\n";
         
         if (directFiles.size() + extractFiles.size() > 0) {
@@ -684,7 +617,7 @@ for (size_t batch_start = 0; batch_start < directFiles.size(); batch_start += (B
         docManager.setBatchMode(false);
         docManager.setSilentMode(false);
         
-        std::cerr << "❌ CRITICAL ERROR in folder upload: " << e.what() << "\n";
+        std::cerr << " CRITICAL ERROR in folder upload: " << e.what() << "\n";
         
         res.status = 500;
         res.set_content(json({

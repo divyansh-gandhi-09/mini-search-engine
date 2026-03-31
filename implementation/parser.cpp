@@ -36,7 +36,7 @@ vector<string> Parser::tokenize(const string& text) {
         } else if (!word.empty()) {
             tokens.push_back(std::move(word));
             word.clear();
-            word.reserve(50); // Re-reserve after move
+            
         }
     }
     

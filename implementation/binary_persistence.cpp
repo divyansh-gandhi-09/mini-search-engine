@@ -131,6 +131,12 @@ void BinaryPersistence::saveBinary(
             writeInt(out, freq);
         }
     }
+    out.flush();
+    if (!out.good()) {
+        out.close();
+        fs::remove("index.bin.tmp");
+        throw std::runtime_error("Failed to write binary index");
+    }
 
     out.close();
 
@@ -276,7 +282,7 @@ bool BinaryPersistence::loadBinary(
             std::chrono::steady_clock::now() - startTime).count();
 
         std::cout << "Binary index loaded: " << docID << " documents in " 
-                  << loadTime << "ms (~" << (loadTime / static_cast<double>(docID)) 
+                  << loadTime << "ms (~" << (docID > 0 ? loadTime / static_cast<double>(docID) : 0.0) 
                   << "ms per doc)\n";
 
         return true;

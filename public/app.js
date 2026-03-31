@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let searchHistory = [];
   let isOnline = true;
   let availableFolders = []; // Store folders globally
-
+  let activeFolderFilter = ''; // '' = all, '__ROOT__' = root only, else folder name
   // utils
   function debounce(fn, ms = 200) {
     let t;
@@ -24,7 +24,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       t = setTimeout(() => fn(...args), ms);
     };
   }
-
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text || "";
+    return div.innerHTML;
+}
   async function fetchJSON(url, options = {}) {
     try {
       showLoadingIndicator(true);
@@ -384,46 +388,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     modal.className = "modal";
 
     const isLargeFile = doc.content && doc.content.length > 100000;
-    const displayContent = isLargeFile ? doc.content.substring(0, 50000) + "\n\n... [Content truncated for display - use Download button to get full file] ..." : doc.content;
+    const displayContent = isLargeFile 
+        ? doc.content.substring(0, 50000) + "\n\n... [Content truncated for display - use Download button to get full file] ..." 
+        : doc.content;
 
     modal.innerHTML = `
       <div class="modal-content">
         <div class="modal-header">
-          <h2>📄 ${doc.url || doc.filename}</h2>
+          <h2>📄 ${escapeHtml(doc.url || doc.filename)}</h2>
           <span class="close" title="Close (Esc)">&times;</span>
         </div>
         <div class="modal-meta">
-          <div class="muted"><strong>Path:</strong> ${doc.path || ""}</div>
-          ${doc.folder ? `<div class="muted"><strong>Folder:</strong> ${doc.folder}</div>` : ""}
+          <div class="muted"><strong>Path:</strong> ${escapeHtml(doc.path || "")}</div>
+          ${doc.folder ? `<div class="muted"><strong>Folder:</strong> ${escapeHtml(doc.folder)}</div>` : ""}
           <div class="muted"><strong>Size:</strong> ${formatFileSize(doc.size || doc.content?.length || 0)}</div>
         </div>
         ${isLargeFile ? '<div class="large-file-warning">⚠️ Large file detected - showing first 50KB only. Use Download button for full content.</div>' : ''}
         <div class="modal-actions">
-          <button class="modal-btn" onclick="copyToClipboard(\`${(displayContent || "").replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)">📋 Copy ${isLargeFile ? 'Visible' : ''} Content</button>
-          <button class="modal-btn" onclick="downloadDocument('${doc.url || doc.filename}', \`${(doc.content || "").replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)">💾 Download Full File</button>
-          <button class="modal-btn" onclick="this.closest('.modal').remove()">✖️ Close</button>
+          <button class="modal-btn copy-btn">📋 Copy ${isLargeFile ? 'Visible' : ''} Content</button>
+          <button class="modal-btn dl-btn">💾 Download Full File</button>
+          <button class="modal-btn close-btn-modal">✖️ Close</button>
         </div>
         <div class="doc-content-wrapper">
-          <pre class="doc-text">${highlightText(displayContent || "", query)}</pre>
+          <pre class="doc-text">${highlightText(escapeHtml(displayContent || ""), query)}</pre>
         </div>
       </div>
     `;
 
     document.body.appendChild(modal);
 
+    //  Safe event listeners — no content in onclick attributes
+    modal.querySelector(".copy-btn").addEventListener("click", () => {
+        copyToClipboard(displayContent || "");
+    });
+    modal.querySelector(".dl-btn").addEventListener("click", () => {
+        downloadDocument(doc.url || doc.filename, doc.content || "");
+    });
+    modal.querySelector(".close-btn-modal").addEventListener("click", () => modal.remove());
+
     modal.querySelector(".close").onclick = () => modal.remove();
     modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.remove();
+        if (e.target === modal) modal.remove();
     });
 
     const handleEscape = (e) => {
-      if (e.key === "Escape") {
-        modal.remove();
-        document.removeEventListener("keydown", handleEscape);
-      }
+        if (e.key === "Escape") {
+            modal.remove();
+            document.removeEventListener("keydown", handleEscape);
+        }
     };
     document.addEventListener("keydown", handleEscape);
-  }
+}
 
   window.copyToClipboard = function (text) {
     navigator.clipboard.writeText(text).then(() => {
@@ -483,42 +498,59 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Search
   async function performSearch() {
     const q = input.value.trim();
-    const folderFilter = $("#folder-filter")?.value || "";
+
+    // Resolve folder param: __ROOT__ means empty string (root docs)
+    const folderParam = activeFolderFilter === '__ROOT__' ? '__ROOT__' : activeFolderFilter;
 
     if (!q) {
-      showNotification("Please enter a search query", "warning");
-      return;
+        showNotification("Please enter a search query", "warning");
+        return;
     }
 
     resultsEl.innerHTML = `<div class="loading-state">🔍 Searching...</div>`;
 
     try {
-      let url = `/search?query=${encodeURIComponent(q)}`;
-      if (folderFilter) url += `&folder=${encodeURIComponent(folderFilter)}`;
-      const data = await fetchJSON(url);
-      renderResults(data);
-      document.title = `Search: ${q} - Mini Search Engine`;
+        let url = `/search?query=${encodeURIComponent(q)}`;
+        if (folderParam) url += `&folder=${encodeURIComponent(folderParam)}`;
+        const data = await fetchJSON(url);
+
+        // If filtering by root, client-side filter docs where folder === ""
+        const filtered = activeFolderFilter === '__ROOT__'
+            ? data.filter(r => !r.folder || r.folder === '')
+            : data;
+
+        renderResults(filtered);
+        document.title = `Search: ${q} - Mini Search Engine`;
     } catch (e) {
-      resultsEl.innerHTML = `<div class="error-state">❌ Error: ${e.message}</div>`;
-      showNotification("Search failed: " + e.message, "error");
+        resultsEl.innerHTML = `<div class="error-state">❌ Error: ${e.message}</div>`;
+        showNotification("Search failed: " + e.message, "error");
     }
-  }
+}
 
   async function listAllDocuments() {
     resultsEl.innerHTML = `<div class="loading-state">📂 Loading documents...</div>`;
 
     try {
-      const folderFilter = $("#folder-filter")?.value || "";
-      let url = "/documents";
-      if (folderFilter) url += `?folder=${encodeURIComponent(folderFilter)}`;
-      const data = await fetchJSON(url);
-      renderResults(data);
-      document.title = "All Documents - Mini Search Engine";
+        // The C++ backend filters by exact folder name — root docs have folder=""
+        // so we fetch all and filter client-side for __ROOT__
+        let url = "/documents";
+        if (activeFolderFilter && activeFolderFilter !== '__ROOT__') {
+            url += `?folder=${encodeURIComponent(activeFolderFilter)}`;
+        }
+
+        const data = await fetchJSON(url);
+
+        const filtered = activeFolderFilter === '__ROOT__'
+            ? data.filter(r => !r.folder || r.folder === '')
+            : data;
+
+        renderResults(filtered);
+        document.title = "All Documents - Mini Search Engine";
     } catch (e) {
-      resultsEl.innerHTML = `<div class="error-state">❌ Error: ${e.message}</div>`;
-      showNotification("Failed to load documents: " + e.message, "error");
+        resultsEl.innerHTML = `<div class="error-state">❌ Error: ${e.message}</div>`;
+        showNotification("Failed to load documents: " + e.message, "error");
     }
-  }
+}
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -694,32 +726,93 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Load folders into dropdowns
   async function loadFolders() {
     try {
-      const folders = await fetchJSON("/folders");
-      availableFolders = folders; // Store globally
-      console.log("Loaded folders:", availableFolders);
+        const folders = await fetchJSON("/folders");
+        availableFolders = folders;
 
-      const folderSelects = $$("#folder-select, #folder-filter");
+        const treeContainer = document.getElementById('folder-tree-nodes');
+        if (treeContainer) {
+            treeContainer.innerHTML = '';
 
-      folderSelects.forEach((select) => {
-        const isFilter = select.id === "folder-filter";
-        const currentValue = select.value;
+            // "All Folders" button
+            const allBtn = document.getElementById('folder-tree-all');
+            if (allBtn) {
+                allBtn.onclick = () => {
+                    activeFolderFilter = '';
+                    setActiveFolderBtn('');
+                    const q = input.value.trim();
+                    if (q) performSearch(); else listAllDocuments();
+                };
+            }
 
-        select.innerHTML = isFilter ? `<option value="">All Folders</option>` : `<option value="">-- Select Folder --</option>`;
+            // Root button (files with folder === "")
+            const rootBtn = document.createElement('button');
+            rootBtn.className = 'folder-tree-btn';
+            rootBtn.dataset.folderKey = '__ROOT__';
+            rootBtn.innerHTML = `<span class="ftree-icon">🏠</span><span class="ftree-name">Root</span>`;
+            rootBtn.addEventListener('click', () => {
+                activeFolderFilter = '__ROOT__';
+                setActiveFolderBtn('__ROOT__');
+                const q = input.value.trim();
+                if (q) performSearch(); else listAllDocuments();
+            });
+            treeContainer.appendChild(rootBtn);
 
-        folders.forEach((f) => {
-          const option = document.createElement("option");
-          option.value = f;
-          option.textContent = f;
-          if (f === currentValue) option.selected = true;
-          select.appendChild(option);
-        });
-      });
+            // Divider
+            const divider = document.createElement('div');
+            divider.className = 'ftree-divider';
+            treeContainer.appendChild(divider);
+
+            // One button per subfolder, indented by depth
+            folders.forEach(f => {
+                const depth = (f.match(/\//g) || []).length;
+                const label = f.split('/').pop();
+
+                const btn = document.createElement('button');
+                btn.className = 'folder-tree-btn';
+                btn.dataset.folderKey = f;
+                btn.style.paddingLeft = `${8 + depth * 14}px`;
+                btn.innerHTML = `<span class="ftree-icon">📁</span><span class="ftree-name">${escapeHtml(label)}</span>`;
+
+                btn.addEventListener('click', () => {
+                    activeFolderFilter = f;
+                    setActiveFolderBtn(f);
+                    const q = input.value.trim();
+                    if (q) performSearch(); else listAllDocuments();
+                });
+
+                treeContainer.appendChild(btn);
+            });
+        }
+
+        // Keep upload form folder-select dropdown updated
+        const uploadSelect = document.getElementById('folder-select');
+        if (uploadSelect) {
+            const cur = uploadSelect.value;
+            uploadSelect.innerHTML = '<option value="">-- Select Folder --</option>';
+            folders.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.textContent = f;
+                if (f === cur) opt.selected = true;
+                uploadSelect.appendChild(opt);
+            });
+        }
+
     } catch (err) {
-      console.error("Failed to load folders:", err);
-      showNotification("Failed to load folders", "error");
+        console.error("Failed to load folders:", err);
+        showNotification("Failed to load folders", "error");
     }
-  }
-
+}
+function setActiveFolderBtn(key) {
+    document.querySelectorAll('.folder-tree-btn').forEach(b => b.classList.remove('active'));
+    const allBtn = document.getElementById('folder-tree-all');
+    if (key === '') {
+        if (allBtn) allBtn.classList.add('active');
+    } else {
+        const target = document.querySelector(`.folder-tree-btn[data-folder-key="${key}"]`);
+        if (target) target.classList.add('active');
+    }
+}
   // Create folder
   async function createFolder() {
     const folderName = $("#new-folder-name").value.trim();
@@ -798,14 +891,7 @@ if (rebuildUpdateBtn) rebuildUpdateBtn.addEventListener("click", () => rebuildIn
 const createFolderBtn = $("#create-folder-btn");
 if (createFolderBtn) createFolderBtn.addEventListener("click", createFolder);
 
-const folderFilter = $("#folder-filter");
-if (folderFilter) {
-  folderFilter.addEventListener("change", () => {
-    const currentQuery = input.value.trim();
-    if (currentQuery) performSearch();
-    else listAllDocuments();
-  });
-}
+
 
 // === Keyboard Shortcuts ===
 document.addEventListener("keydown", (e) => {
@@ -831,11 +917,8 @@ window.addEventListener('foldersUpdated', (event) => {
     populateMoveToFolderDropdowns();
 });
 
-// ✅ Also refresh folders when stats refresh
-window.addEventListener('refreshFolders', async () => {
-    console.log('🔄 Refreshing folders...');
-    await loadFolders();
-});
+//  Also refresh folders when stats refresh
+
 
 // === Help Modal ===
 const helpModal = document.getElementById("help-modal");
@@ -863,4 +946,5 @@ console.log("Mini Search Engine initialized");
 // === Initial Load ===
 await Promise.all([loadFolders(), loadStats()]);
 input?.focus();
+window.dispatchEvent(new CustomEvent('appReady'));
 }); // end DOMContentLoaded

@@ -7,7 +7,7 @@
 SearchEngine::SearchEngine(
     const std::unordered_map<std::string, std::unordered_map<int,int>>& index,
     int totalDocs)
-    : invertedIndex(index), totalDocuments(totalDocs) {}
+    : invertedIndex(&index), totalDocuments(totalDocs) {} 
 
 std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query, const Ranker& ranker) {
     // Parser::tokenize already converts to lowercase
@@ -44,8 +44,8 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         
         // Calculate scores only for documents that contain ALL terms
         for (const auto& term : actualTerms) {
-            auto it = invertedIndex.find(term);
-            if (it == invertedIndex.end()) continue;
+            auto it = invertedIndex->find(term);
+            if (it == invertedIndex->end()) continue;
 
             const auto& docFreqMap = it->second;
             int df = static_cast<int>(docFreqMap.size());
@@ -61,8 +61,8 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         //  OPTIMIZED: Pre-allocate based on estimated result size
         size_t estimatedResults = 0;
         for (const auto& term : actualTerms) {
-            auto it = invertedIndex.find(term);
-            if (it != invertedIndex.end()) {
+            auto it = invertedIndex->find(term);
+            if (it != invertedIndex->end()) {
                 estimatedResults += it->second.size();
             }
         }
@@ -70,8 +70,8 @@ std::vector<std::pair<int,double>> SearchEngine::search(const std::string& query
         
         // Regular OR operation - documents containing ANY term
         for (const auto& term : actualTerms) {
-            auto it = invertedIndex.find(term);
-            if (it == invertedIndex.end()) {
+            auto it = invertedIndex->find(term);
+            if (it == invertedIndex->end()) {
                 std::cout << "Term '" << term << "' not found in index\n";
                 continue;
             }
@@ -113,8 +113,8 @@ std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string
     size_t smallestSize = SIZE_MAX;
     
     for (size_t i = 0; i < terms.size(); ++i) {
-        auto it = invertedIndex.find(terms[i]);
-        if (it == invertedIndex.end()) {
+        auto it = invertedIndex->find(terms[i]);
+        if (it == invertedIndex->end()) {
             std::cout << "AND term '" << terms[i] << "' not found - returning empty set\n";
             return {}; // Term not found = no results
         }
@@ -125,7 +125,7 @@ std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string
     }
     
     // Start with smallest set for efficiency
-    auto startIt = invertedIndex.find(terms[smallestIdx]);
+    auto startIt = invertedIndex->find(terms[smallestIdx]);
     std::unordered_set<int> resultSet;
     resultSet.reserve(startIt->second.size());
     
@@ -137,8 +137,8 @@ std::unordered_set<int> SearchEngine::andOperation(const std::vector<std::string
     for (size_t i = 0; i < terms.size(); ++i) {
         if (i == smallestIdx) continue; // Skip the one we started with
         
-        auto it = invertedIndex.find(terms[i]);
-        if (it == invertedIndex.end()) {
+        auto it = invertedIndex->find(terms[i]);
+        if (it == invertedIndex->end()) {
             return {}; // Early exit - no results possible
         }
         
@@ -177,16 +177,16 @@ std::unordered_set<int> SearchEngine::orOperation(const std::vector<std::string>
     // Estimate size for reserve
     size_t estimatedSize = 0;
     for (const auto& term : terms) {
-        auto it = invertedIndex.find(term);
-        if (it != invertedIndex.end()) {
+        auto it = invertedIndex->find(term);
+        if (it != invertedIndex->end()) {
             estimatedSize += it->second.size();
         }
     }
     resultSet.reserve(std::min<size_t>(estimatedSize, 100000));
     
     for (const std::string& term : terms) {
-        auto it = invertedIndex.find(term);
-        if (it == invertedIndex.end()) continue;
+        auto it = invertedIndex->find(term);
+        if (it == invertedIndex->end()) continue;
         
         for (const auto& [docId, _] : it->second) {
             resultSet.insert(docId);

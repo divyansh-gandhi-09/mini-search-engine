@@ -3,7 +3,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Wait for main app to initialize
-    setTimeout(initBatchUpload, 500);
+    window.addEventListener('appReady', initBatchUpload, { once: true });
 
     let batchFiles = [];
     let folderFiles = [];
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Load folders
         loadBatchFolders();
         
-        console.log('✅ Batch upload system ready');
+        console.log(' Batch upload system ready');
     }
 
     // ========================================
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (folder) formData.append('folder', folder);
 
-        // ✅ REMOVED: Fake progress loop
+        //  REMOVED: Fake progress loop
         // Just show initial state
         updateProgress('batchProgressFill', 'progressPercentage', 0);
         
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateQueueItemStatus(i, 'processing', 'Uploading...');
         });
 
-        // ✅ Actually upload (the C++ side is fast!)
+        //  Actually upload (the C++ side is fast!)
         console.time('Batch Upload');
         const response = await fetch('/upload/batch', {
             method: 'POST',
@@ -234,21 +234,21 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProgress('batchProgressFill', 'progressPercentage', 100);
         
         const message = result.failed === 0
-            ? `✅ All ${result.successful} files uploaded successfully!`
+            ? ` All ${result.successful} files uploaded successfully!`
             : `⚠️ Upload complete: ${result.successful} succeeded, ${result.failed} failed`;
         
         showNotification(message, result.failed === 0 ? 'success' : 'warning');
         
-        // ✅ Refresh both stats AND folders
+        //  Refresh both stats AND folders
         window.dispatchEvent(new CustomEvent('refreshStats'));
         window.dispatchEvent(new CustomEvent('refreshFolders'));
         
-        // ✅ Also reload folders directly
+        //  Also reload folders directly
         await loadBatchFolders();
         
     } catch (error) {
         console.error('Batch upload error:', error);
-        showNotification('❌ Upload error: ' + error.message, 'error');
+        showNotification(' Upload error: ' + error.message, 'error');
     } finally {
         btn.disabled = false;
         btn.textContent = '🚀 Upload All Files';
@@ -326,29 +326,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uploadBtn) uploadBtn.addEventListener('click', executeFolderUpload);
         if (clearBtn) clearBtn.addEventListener('click', clearFolderQueue);
     }
-
+    async function readAllEntries(dirReader) {
+        const entries = [];
+        while (true) {
+        const batch = await new Promise((resolve, reject) =>
+            dirReader.readEntries(resolve, reject)
+        );
+        if (batch.length === 0) break;
+        entries.push(...batch);
+    }
+    return entries;
+   }
     async function traverseFileTree(item, files, path = '') {
-        if (item.isFile) {
-            return new Promise((resolve) => {
-                item.file((file) => {
-                    const relativePath = path + file.name;
-                    folderStructureMap.set(file, relativePath);
-                    files.push(file);
-                    resolve();
-                });
+    if (item.isFile) {
+        return new Promise((resolve) => {
+            item.file((file) => {
+                folderStructureMap.set(file, path + file.name);
+                files.push(file);
+                resolve();
             });
-        } else if (item.isDirectory) {
-            const dirReader = item.createReader();
-            return new Promise((resolve) => {
-                dirReader.readEntries(async (entries) => {
-                    for (const entry of entries) {
-                        await traverseFileTree(entry, files, path + item.name + '/');
-                    }
-                    resolve();
-                });
-            });
+        });
+    } else if (item.isDirectory) {
+        const dirReader = item.createReader();
+        const entries = await readAllEntries(dirReader);
+        for (const entry of entries) {
+            await traverseFileTree(entry, files, path + item.name + '/');
         }
     }
+}
 
     function handleFolderFiles(files) {
         if (files.length === 0) return;
@@ -379,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ✅ FIXED: Robust folder upload with better error handling
+    //  FIXED: Robust folder upload with better error handling
 async function executeFolderUpload() {
     const btn = document.getElementById('folderUploadBtn');
     if (!btn) return;
@@ -388,7 +393,7 @@ async function executeFolderUpload() {
     btn.textContent = '⏳ Uploading Folder...';
     
     try {
-        // ✅ CRITICAL FIX: Split into chunks to avoid memory/timeout issues
+        //  CRITICAL FIX: Split into chunks to avoid memory/timeout issues
         const CHUNK_SIZE = 500;  // Upload 500 files at a time
         const chunks = [];
         
@@ -409,7 +414,12 @@ async function executeFolderUpload() {
             
             // Add files from this chunk
             chunk.forEach(file => {
-                const relativePath = folderStructureMap.get(file) || file.name;
+                let relativePath = folderStructureMap.get(file) || file.name;
+    // Strip the top-level folder name to be consistent with webkitRelativePath behaviour
+                const slashIdx = relativePath.indexOf('/');
+                if (slashIdx !== -1) {
+                    relativePath = relativePath.substring(slashIdx + 1); // remove root folder prefix
+                }
                 formData.append(`file-${relativePath}`, file);
             });
             
@@ -650,7 +660,7 @@ window.addEventListener('refreshStats', async () => {
             }
         });
         
-        // ✅FIX: Trigger app.js to update move-to-folder dropdowns
+        //  Trigger app.js to update move-to-folder dropdowns
         window.dispatchEvent(new CustomEvent('foldersUpdated', { 
             detail: { folders: folders } 
         }));
@@ -718,12 +728,12 @@ window.addEventListener('refreshStats', async () => {
 
     function showElement(id) {
         const el = document.getElementById(id);
-        if (el) el.style.display = 'block';
+        if (el) el.classList.add('active');
     }
 
     function hideElement(id) {
         const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
+        if (el) el.classList.remove('active');
     }
 
     function formatFileSize(bytes) {

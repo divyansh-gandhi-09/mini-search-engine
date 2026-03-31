@@ -68,23 +68,18 @@ int BKTree::levenshtein(const string& a, const string& b) {
 
 void BKTree::insert(const std::string& word) {
     if (word.empty()) return;
-    if (!root) {
-        root = new Node(word);
-        return;
-    }
+    if (!root) { root = new Node(word); return; }
+
     Node* curr = root;
-    int dist = levenshtein(word, curr->word);
-    
     while (true) {
-        if (curr->word == word) return; // Check before descending
-        
-        if (!curr->children.count(dist)) {
+        int dist = levenshtein(word, curr->word);
+        if (dist == 0) return;  // exact match — already present
+        auto it = curr->children.find(dist);
+        if (it == curr->children.end()) {
             curr->children[dist] = new Node(word);
             return;
         }
-        
-        curr = curr->children[dist];
-        dist = levenshtein(word, curr->word);
+        curr = it->second;
     }
 }
 

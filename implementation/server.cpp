@@ -26,7 +26,7 @@ int main() {
 
     httplib::Server svr;
     
-    // ✅ FIX: Set timeouts for large uploads
+    //  Set timeouts for large uploads
     svr.set_read_timeout(1200, 0);   // 10 minutes for reading request
     svr.set_write_timeout(1200, 0);  // 10 minutes for writing response
     svr.set_keep_alive_max_count(100);  // Allow keep-alive connections

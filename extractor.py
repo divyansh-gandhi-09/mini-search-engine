@@ -78,7 +78,7 @@ app.add_middleware(
 
 # Use all CPU cores
 import multiprocessing as mp
-MAX_WORKERS = mp.cpu_count()
+MAX_WORKERS = max(1, mp.cpu_count() // 2)
 logger.info(f" Initialized with {MAX_WORKERS} parallel workers")
 
 SUPPORTED_EXTENSIONS = {
@@ -93,13 +93,12 @@ SUPPORTED_EXTENSIONS = {
 }
 
 def clean_text(text: str) -> str:
-    """Clean and normalize extracted text"""
     if not text:
         return ""
-    text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', text)
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
-    text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+    text = text.replace('\r\n', '\n').replace('\r', '\n')   # normalize line endings first
+    text = re.sub(r'\n{3,}', '\n\n', text)                  # collapse triple+ newlines
+    text = re.sub(r'[ \t]+', ' ', text)                     # collapse horizontal space only
+    text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', text)  # strip control chars
     return text.strip()
 
 def extract_from_pdf(content: bytes, filename: str) -> dict:
@@ -109,7 +108,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
         
         #  Verify content is not empty
         if not content or len(content) < 100:
-            logger.error(f"❌ PDF too small or empty: {filename}")
+            logger.error(f" PDF too small or empty: {filename}")
             return {
                 'success': False,
                 'filename': filename,
@@ -118,7 +117,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
         
         #  Check if it's actually a PDF
         if b'%PDF' not in content[:1024]:  # Check first 1KB
-            logger.error(f"❌ Not a valid PDF: {filename}")
+            logger.error(f" Not a valid PDF: {filename}")
             return {'success': False, 'error': 'File is not a valid PDF'}
         
         pdf = fitz.open(stream=content, filetype="pdf")
@@ -136,19 +135,37 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
                 else:
                     logger.warning(f"  ⚠️ Page {page_num}: Empty")
             except Exception as e:
-                logger.error(f"  ❌ Page {page_num} failed: {e}")
+                logger.error(f"   Page {page_num} failed: {e}")
         
         pdf.close()
         
         full_text = clean_text("\n\n".join(text_parts))
         
         if not full_text:
-            logger.error(f"❌ PDF extraction resulted in empty text: {filename}")
-            return {
-                'success': False,
-                'filename': filename,
-                'error': f'No text extracted from {page_count} pages (scanned PDF?)'
-            }
+            logger.info(f"No text layer found in {filename}, attempting OCR on {page_count} pages...")
+            ocr_parts = []
+            pdf2 = fitz.open(stream=content, filetype="pdf")
+            for page in pdf2:
+                pix = page.get_pixmap(dpi=300)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                img = preprocess_image(img)   # see FIX-09
+                page_text = pytesseract.image_to_string(img, config='--oem 3 --psm 3')
+                if page_text.strip():
+                    ocr_parts.append(page_text)
+            pdf2.close()
+            full_text = clean_text("\n\n".join(ocr_parts))
+            if full_text:
+                logger.info(f"OCR fallback succeeded: {len(full_text)} chars")
+            if not full_text:
+        # OCR also found nothing — truly empty or unreadable
+                logger.error(f"❌ OCR fallback also failed for: {filename}")
+                return {
+                    'success': False,
+                    'filename': filename,
+                    'error': f'No text extractable from {page_count} pages (unreadable or image-only PDF)'
+                 }
+    
+            logger.info(f" OCR fallback succeeded: {len(full_text)} chars from {filename}")
         
         logger.info(f" PDF extracted: {len(full_text)} chars from {len(text_parts)} pages")
         
@@ -162,7 +179,7 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
         
     except Exception as e:
         error_msg = f"PDF extraction failed: {str(e)}"
-        logger.error(f"❌ {filename}: {error_msg}")
+        logger.error(f" {filename}: {error_msg}")
         logger.error(f"   Traceback: {traceback.format_exc()}")
         return {
             'success': False,
@@ -170,11 +187,26 @@ def extract_from_pdf(content: bytes, filename: str) -> dict:
             'error': error_msg,
             'traceback': traceback.format_exc()
         }
+from PIL import ImageFilter, ImageEnhance, ImageOps
+
+def preprocess_image(image: Image.Image) -> Image.Image:
+    """Improve image quality before OCR"""
+    image = image.convert('L')  # grayscale
+    # Upscale if too small — Tesseract needs ~300 DPI
+    if image.width < 1000:
+        scale = 1000 / image.width
+        image = image.resize(
+            (int(image.width * scale), int(image.height * scale)),
+            Image.LANCZOS
+        )
+    image = ImageEnhance.Contrast(image).enhance(2.0)
+    image = image.filter(ImageFilter.SHARPEN)
+    return image
 
 def extract_from_image(content: bytes, filename: str) -> dict:
     """Extract text from images using OCR"""
     try:
-        logger.info(f"🖼️ Extracting image: {filename} ({len(content)} bytes)")
+        logger.info(f" Extracting image: {filename} ({len(content)} bytes)")
         
         if not content:
             return {
@@ -184,13 +216,14 @@ def extract_from_image(content: bytes, filename: str) -> dict:
             }
         
         image = Image.open(io.BytesIO(content))
+        image = preprocess_image(image)  
         logger.info(f"  Image size: {image.size}, mode: {image.mode}")
         
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
         # Fast OCR with minimal overhead
-        text = pytesseract.image_to_string(image, config='--oem 3 --psm 6')
+        text = pytesseract.image_to_string(image, config='--oem 3 --psm 3')
         
         cleaned_text = clean_text(text)
         logger.info(f" OCR extracted: {len(cleaned_text)} chars")
@@ -203,7 +236,7 @@ def extract_from_image(content: bytes, filename: str) -> dict:
         }
     except Exception as e:
         error_msg = f"OCR failed: {str(e)}"
-        logger.error(f"❌ {filename}: {error_msg}")
+        logger.error(f" {filename}: {error_msg}")
         return {
             'success': False,
             'filename': filename,
@@ -236,7 +269,7 @@ def extract_from_docx(content: bytes, filename: str) -> dict:
             'filename': filename
         }
     except Exception as e:
-        logger.error(f"❌ DOCX extraction failed for {filename}: {str(e)}")
+        logger.error(f" DOCX extraction failed for {filename}: {str(e)}")
         return {
             'success': False,
             'filename': filename,
@@ -305,7 +338,7 @@ def extract_from_html(content: bytes, filename: str) -> dict:
             'filename': filename
         }
     except Exception as e:
-        logger.error(f"❌ HTML extraction failed for {filename}: {str(e)}")
+        logger.error(f" HTML extraction failed for {filename}: {str(e)}")
         return {
             'success': False,
             'filename': filename,
@@ -369,7 +402,7 @@ def extract_single_file(content: bytes, filename: str) -> dict:
         
     except Exception as e:
         error_msg = f"Extraction failed: {str(e)}"
-        logger.error(f"❌ {filename}: {error_msg}")
+        logger.error(f" {filename}: {error_msg}")
         logger.error(f"   Traceback: {traceback.format_exc()}")
         return {
             'success': False,
@@ -382,7 +415,7 @@ def extract_single_file(content: bytes, filename: str) -> dict:
 @app.post("/extract")
 async def extract_text(file: UploadFile = File(...)):
     """Single file extraction endpoint"""
-    logger.info(f"📨 Received single file: {file.filename}")
+    logger.info(f" Received single file: {file.filename}")
     
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -396,7 +429,7 @@ async def extract_text(file: UploadFile = File(...)):
     result = extract_single_file(content, file.filename)
     
     if not result['success']:
-        logger.error(f"❌ Extraction failed: {result.get('error', 'Unknown error')}")
+        logger.error(f" Extraction failed: {result.get('error', 'Unknown error')}")
         raise HTTPException(status_code=500, detail=result['error'])
     
     return {
@@ -451,13 +484,13 @@ async def extract_batch_parallel(files: List[UploadFile] = File(...)):
                 if result['success']:
                     logger.info(f"[{completed}/{len(files)}] {filename}: {len(result['text'])} chars")
                 else:
-                    logger.error(f"❌ [{completed}/{len(files)}] {filename}: {result.get('error', 'Unknown')}")
+                    logger.error(f" [{completed}/{len(files)}] {filename}: {result.get('error', 'Unknown')}")
                 
                 if completed % 50 == 0:
                     logger.info(f"📊 Progress: {completed}/{len(files)} completed")
                     
             except Exception as e:
-                logger.error(f"❌ Fatal error processing {filename}: {e}")
+                logger.error(f" Fatal error processing {filename}: {e}")
                 logger.error(f"   Traceback: {traceback.format_exc()}")
                 results.append({
                     'success': False,
@@ -469,11 +502,11 @@ async def extract_batch_parallel(files: List[UploadFile] = File(...)):
     successful = [r for r in results if r.get('success')]
     failed = [r for r in results if not r.get('success')]
     
-    logger.info(f"🎉 Batch complete: {len(successful)} | {len(failed)} ❌")
+    logger.info(f"🎉 Batch complete: {len(successful)} | {len(failed)} ")
     
     # Log failed files for debugging
     if failed:
-        logger.error("❌ Failed files:")
+        logger.error(" Failed files:")
         for fail in failed:
             logger.error(f"   - {fail['filename']}: {fail.get('error', 'Unknown')}")
     

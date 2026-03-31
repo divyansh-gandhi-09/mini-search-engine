@@ -1,9 +1,8 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -g -I"header files" -Ithird_party -MMD -MP -fopenmp
-
+CXXFLAGS = -std=c++20 -O2 -I"header files" -Ithird_party -MMD -MP -fopenmp
 # Platform-specific linker flags
 ifeq ($(OS),Windows_NT)
-	LDFLAGS = -lws2_32 -lstdc++fs
+	LDFLAGS = -lws2_32 -lstdc++fs -fopenmp
 else
 	LDFLAGS = -lstdc++fs -pthread -fopenmp
 endif

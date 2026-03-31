@@ -691,6 +691,130 @@
           .modal-actions { flex-direction: column; }
           .modal-btn { width: 100%; }
         }
+        #folder-tree {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 160px;
+        }
+        .folder-tree-btn {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          width: 100%;
+          background: none;
+          border: none;
+          border-radius: 8px;
+          padding: 6px 8px;
+          cursor: pointer;
+          font-size: 0.875rem;
+          color: #4a5568;
+          text-align: left;
+          transition: background 0.15s ease;
+        }
+        .folder-tree-btn:hover { background: #edf2f7; }
+        .folder-tree-btn.active {
+          background: #EEEDFE;
+          color: #3C3489;
+          font-weight: 600;
+        }
+        .ftree-icon { font-size: 13px; flex-shrink: 0; }
+        .ftree-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ftree-divider {
+          height: 1px;
+          background: #e2e8f0;
+          margin: 4px 0;
+        }
+        /* Results + Sidebar layout */
+.results-layout {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+}
+
+.folder-sidebar {
+    width: 190px;
+    flex-shrink: 0;
+    background: white;
+    border-radius: 20px;
+    padding: 1.25rem 1rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 20px;
+}
+
+.sidebar-label {
+    font-size: 0.75rem;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 4px;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+/* Results section loses its own margin-bottom since layout handles it */
+.results-layout .results-section {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+/* Folder tree buttons */
+#folder-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.folder-tree-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: #4a5568;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+.folder-tree-btn:hover { background: #edf2f7; }
+.folder-tree-btn.active {
+    background: #EEEDFE;
+    color: #3C3489;
+    font-weight: 600;
+}
+.ftree-icon { font-size: 13px; flex-shrink: 0; }
+.ftree-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ftree-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 4px 0;
+}
+
+/* Responsive — sidebar collapses on mobile */
+@media (max-width: 768px) {
+    .results-layout { flex-direction: column; }
+    .folder-sidebar {
+        width: 100%;
+        position: static;
+        padding: 1rem;
+    }
+    #folder-tree {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .folder-tree-btn {
+        width: auto;
+        flex-shrink: 0;
+    }
+    .ftree-divider { display: none; }
+}
     </style>
 </head>
 <body>
@@ -712,34 +836,46 @@
             </form>
 
             <!-- Filter Controls -->
+            <!-- Filter Controls (top bar — folder create + index rebuild only) -->
             <div class="filter-controls">
-                <div>
-                    <label for="folder-filter">Filter by folder:</label>
-                    <select id="folder-filter">
-                        <option value="">All Folders</option>
-                    </select>
-                </div>
-                <div>
-                    <input type="text" id="new-folder-name" placeholder="New folder name">
-                    <button id="create-folder-btn" class="btn btn-secondary btn-small">Create Folder</button>
-                </div>
-                <div>
-                    <button id="rebuild-update" class="btn btn-secondary btn-small">Update Index</button>
-                    <button id="rebuild-fresh" class="btn btn-secondary btn-small">Rebuild Index</button>
-                </div>
+              <div>
+                <input type="text" id="new-folder-name" placeholder="New folder name">
+                <button id="create-folder-btn" class="btn btn-secondary btn-small">Create Folder</button>
+              </div>
+              <div>
+                <button id="rebuild-update" class="btn btn-secondary btn-small">Update Index</button>
+                <button id="rebuild-fresh" class="btn btn-secondary btn-small">Rebuild Index</button>
+              </div>
             </div>
 
-            <!-- Live Assistance -->
+<!-- Live Assistance -->
             <div class="pill-row" id="suggestions"></div>
             <div class="pill-row" id="corrections"></div>
-        </section>
+          </section>
 
-        <!-- Results Section -->
-        <section class="results-section">
-            <div id="results">
+<!-- Results + Sidebar Layout -->
+          <div class="results-layout">
+
+    <!-- Folder Sidebar -->
+            <aside class="folder-sidebar">
+              <div class="sidebar-label">Filter by folder</div>
+              <div id="folder-tree">
+                <button id="folder-tree-all" class="folder-tree-btn active">
+                  <span class="ftree-icon">📂</span>
+                  <span class="ftree-name">All Folders</span>
+                </button>
+                <div id="folder-tree-nodes"></div>
+              </div>
+            </aside>
+
+    <!-- Results Panel -->
+            <section class="results-section">
+              <div id="results">
                 <div class="loading-state">Enter a search query or click "Show All" to see documents.</div>
-            </div>
-        </section>
+              </div>
+            </section>
+
+</div>
 
         <!-- Upload Section with Batch Support -->
         <section class="management-section">
